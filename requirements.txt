@@ -1,0 +1,16 @@
+# Kärn-beroenden
+httpx>=0.27
+python-dotenv>=1.0
+
+# HTML-parsning (HTML-backend)
+beautifulsoup4>=4.12
+
+# MCP-protokoll
+mcp>=1.0
+
+# PostgreSQL (frivilligt — krävs om DATABASE_URL=postgresql://...)
+psycopg2-binary>=2.9
+
+# HTTP-transport (frivilligt — krävs om MCP_TRANSPORT=http)
+starlette>=0.40
+uvicorn>=0.30
