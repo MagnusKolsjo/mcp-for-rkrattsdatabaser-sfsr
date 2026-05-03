@@ -31,7 +31,7 @@ Fynd från körning 2026-05-03:
     ikraftDateTime eller beteckning i applikationskoden.
   - rubrik kan vara None (ej bara tom sträng) för gamla ändringar.
   - ikraftDateTime kan vara None (ändring av ikraftträdandebestämmelse).
-  - celexnummer på grundlagen är radbrytningsseparerade (\n).
+  - celexnummer på grundförfattningen är radbrytningsseparerade (\n).
   - celexnummer på ändring är kommaseparerade (, ).
   - eUdirektiv är en separat bool-flagga (i tillägg till celexnummer).
   - ikraftOvergangsbestammelse är en riktig bool — ingen texttolkning krävs.
@@ -134,9 +134,9 @@ def _parse_förarbeten(text: str | None) -> tuple[str, str, str]:
     return prop, bet, rskr
 
 
-def _parse_celex_grundlag(text: str | None) -> list[str]:
+def _parse_celex_grundforfattning(text: str | None) -> list[str]:
     """
-    Parsar CELEX-fältet på grundlagen.
+    Parsar CELEX-fältet på grundförfattningen.
     Numren är radbrytningsseparerade i API-svaret.
     """
     if not text:
@@ -177,7 +177,7 @@ def till_datamodell(källdata: dict) -> dict:
       departement          ← organisation.namnOchEnhet
       ikraft               ← ikraftDateTime (ISO → datum)
       prop/bet/rskr        ← register.forarbeten (regex)
-      celex (grundlag)     ← register.celexnummer (radbrytning-sep.)
+      celex (grundförfattning)     ← register.celexnummer (radbrytning-sep.)
       andrings_sfs         ← andringsforfattningar[n].beteckning
       rubrik (ändring)     ← andringsforfattningar[n].rubrik (kan vara None)
       omfattning           ← andringsforfattningar[n].anteckningar
@@ -226,7 +226,7 @@ def till_datamodell(källdata: dict) -> dict:
         "prop":        prop,
         "bet":         bet,
         "rskr":        rskr,
-        "celex":       _parse_celex_grundlag(reg.get("celexnummer")),
+        "celex":       _parse_celex_grundforfattning(reg.get("celexnummer")),
         "ändringar":   ändringar,
     }
 
@@ -312,7 +312,7 @@ def main() -> None:
 
   3. ikraftDateTime kan vara None. Normaliseras till "" i _datum().
 
-  4. celexnummer på grundlagen: radbrytningsseparerade (\n).
+  4. celexnummer på grundförfattningen: radbrytningsseparerade (\n).
      celexnummer på ändring: kommaseparerade (, ).
      Skilda parsningsfunktioner krävs.
 

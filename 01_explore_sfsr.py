@@ -20,7 +20,7 @@ Fynd från körning 2026-05-03:
   - SFSR kräver ingen autentisering och inga speciella headers.
   - Rubrik, Ikraft och Förarbeten kan saknas för gamla ändringar (pre-1980).
   - CELEX-nr kan innehålla flera nummer i ett fält (mellanslag-separerade).
-  - Grundlagen kan ha CELEX-nr (t.ex. Miljöbalken: 36 nummer).
+  - Grundförfattningen kan ha CELEX-nr (t.ex. Miljöbalken: 36 nummer).
   - "överg.best." i Ikraft-fältet signalerar en övergångsbestämmelse.
   - Ikraft-fält kan saknas helt för ändringar av ikraftträdandebestämmelser.
 """
@@ -153,11 +153,11 @@ def parsa_sfsr(html: str) -> dict:
     }
 
     Kantfall:
-      - Rubrik på grundlagen identifieras via full_text == bold_text
+      - Rubrik på grundförfattningen identifieras via full_text == bold_text
         (SFS-numret innehåller ":", vilket utesluter villkor på ":").
       - Rubrik, Ikraft och Förarbeten kan saknas i gamla ändringar (pre-1980).
       - CELEX-nr kan innehålla flera nummer (mellanslag-separerade).
-      - Grundlagen kan ha egna CELEX-nr (t.ex. Miljöbalken: 36 nummer).
+      - Grundförfattningen kan ha egna CELEX-nr (t.ex. Miljöbalken: 36 nummer).
       - Ikraft-fält kan innehålla "överg.best." — flaggas som bool.
     """
     soup = BeautifulSoup(html, "html.parser")
@@ -304,7 +304,7 @@ def main() -> None:
     print("Dokumenterade kantfall")
     print(f"{'='*60}")
     print("""
-  1. Rubrik på grundlagen identifieras via full_text == bold_text
+  1. Rubrik på grundförfattningen identifieras via full_text == bold_text
      (SFS-numret innehåller ":", vilket utesluter check på ":").
 
   2. Rubrik-fältet kan saknas på en ändring (t.ex. SFS 1998:811 —
@@ -319,7 +319,7 @@ def main() -> None:
 
   5. CELEX-nr kan innehålla flera nummer i ett fält (mellanslag-sep.).
 
-  6. Grundlagen kan ha egna CELEX-nr (Miljöbalken: 36 nummer).
+  6. Grundförfattningen kan ha egna CELEX-nr (Miljöbalken: 36 nummer).
 
   7. Ändringar av ändringar förekommer (t.ex. SFS 2021:862 ändrar 2021:6).
 """)

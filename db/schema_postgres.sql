@@ -7,19 +7,19 @@
 CREATE SCHEMA IF NOT EXISTS sfsr;
 
 -- ---------------------------------------------------------------------------
--- sfsr_laws: metadata för varje grundlag (ett SFS-nummer = en rad)
+-- sfsr_laws: metadata för varje grundförfattning (ett SFS-nummer = en rad)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS sfsr.sfsr_laws (
     sfs_nr              TEXT        PRIMARY KEY,            -- t.ex. "1993:1617"
     rubrik              TEXT,                               -- lagens officiella namn
-    ikraft_grundlag     DATE,                               -- ikraftträdandedatum för grundlagen
-    celex_grundlag      TEXT,                               -- radbrytningsseparerade CELEX-nr (kan vara tomt)
+    ikraft_grundforfattning     DATE,                               -- ikraftträdandedatum för grundförfattningen
+    celex_grundforfattning      TEXT,                               -- radbrytningsseparerade CELEX-nr (kan vara tomt)
     cached_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(), -- tidpunkt för senaste hämtning
     cache_source        TEXT        NOT NULL DEFAULT 'api'  -- 'api' eller 'html'
 );
 
 -- ---------------------------------------------------------------------------
--- sfsr_amendments: ändrings-SFS per grundlag (ett ändrings-SFS = en rad)
+-- sfsr_amendments: ändrings-SFS per grundförfattning (ett ändrings-SFS = en rad)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS sfsr.sfsr_amendments (
     id                      BIGSERIAL   PRIMARY KEY,

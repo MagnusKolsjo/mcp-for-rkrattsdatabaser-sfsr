@@ -138,13 +138,13 @@ def _spara_i_cache(data: dict) -> None:
                 cur.execute(f"DELETE FROM {p}sfsr_laws WHERE sfs_nr = %s", (sfs_nr,))
                 cur.execute(
                     f"""INSERT INTO {p}sfsr_laws
-                        (sfs_nr, rubrik, ikraft_grundlag, celex_grundlag, cached_at, cache_source)
+                        (sfs_nr, rubrik, ikraft_grundforfattning, celex_grundforfattning, cached_at, cache_source)
                         VALUES (%s, %s, %s, %s, %s, %s)""",
                     (
                         sfs_nr,
                         data.get("rubrik"),
-                        data.get("ikraft_grundlag"),
-                        data.get("celex_grundlag"),
+                        data.get("ikraft_grundforfattning"),
+                        data.get("celex_grundforfattning"),
                         nu,
                         data.get("cache_source", SFSR_BACKEND),
                     ),
@@ -182,13 +182,13 @@ def _spara_i_cache(data: dict) -> None:
             conn.execute(f"DELETE FROM {p}sfsr_laws WHERE sfs_nr = ?", (sfs_nr,))
             conn.execute(
                 f"""INSERT INTO {p}sfsr_laws
-                    (sfs_nr, rubrik, ikraft_grundlag, celex_grundlag, cached_at, cache_source)
+                    (sfs_nr, rubrik, ikraft_grundforfattning, celex_grundforfattning, cached_at, cache_source)
                     VALUES (?,?,?,?,?,?)""",
                 (
                     sfs_nr,
                     data.get("rubrik"),
-                    data.get("ikraft_grundlag"),
-                    data.get("celex_grundlag"),
+                    data.get("ikraft_grundforfattning"),
+                    data.get("celex_grundforfattning"),
                     nu,
                     data.get("cache_source", SFSR_BACKEND),
                 ),
@@ -229,7 +229,7 @@ def _las_fran_cache(sfs_nr: str) -> dict | None:
         conn = _get_pg_conn()
         with conn.cursor() as cur:
             cur.execute(
-                f"SELECT sfs_nr, rubrik, ikraft_grundlag, celex_grundlag FROM {p}sfsr_laws WHERE sfs_nr = %s",
+                f"SELECT sfs_nr, rubrik, ikraft_grundforfattning, celex_grundforfattning FROM {p}sfsr_laws WHERE sfs_nr = %s",
                 (sfs_nr,)
             )
             lag = cur.fetchone()
@@ -250,7 +250,7 @@ def _las_fran_cache(sfs_nr: str) -> dict | None:
     else:
         conn = _get_sqlite_conn()
         lag = conn.execute(
-            f"SELECT sfs_nr, rubrik, ikraft_grundlag, celex_grundlag FROM {p}sfsr_laws WHERE sfs_nr = ?",
+            f"SELECT sfs_nr, rubrik, ikraft_grundforfattning, celex_grundforfattning FROM {p}sfsr_laws WHERE sfs_nr = ?",
             (sfs_nr,)
         ).fetchone()
         if lag is None:
@@ -273,8 +273,8 @@ def _las_fran_cache(sfs_nr: str) -> dict | None:
     return {
         "sfs_nr": lag[0],
         "rubrik": lag[1],
-        "ikraft_grundlag": str(lag[2]) if lag[2] else None,
-        "celex_grundlag": lag[3],
+        "ikraft_grundforfattning": str(lag[2]) if lag[2] else None,
+        "celex_grundforfattning": lag[3],
         "andringar": [
             {
                 "andrings_sfs":         r[0],
@@ -337,8 +337,8 @@ def _hamta_via_api(sfs_nr: str) -> dict:
     return _till_datamodell_api(kalla, sfs_nr)
 
 
-def _parse_celex_grundlag(text: str | None) -> str | None:
-    """Parsar radbrytningsseparerade CELEX-nummer för grundlagen."""
+def _parse_celex_grundforfattning(text: str | None) -> str | None:
+    """Parsar radbrytningsseparerade CELEX-nummer för grundförfattningen."""
     if not text:
         return None
     rader = [r.strip() for r in text.splitlines() if r.strip()]
@@ -420,8 +420,8 @@ def _till_datamodell_api(kalla: dict, sfs_nr: str) -> dict:
     return {
         "sfs_nr":          sfs_nr,
         "rubrik":          kalla.get("rubrik"),
-        "ikraft_grundlag": _datum_api(kalla.get("ikraftDateTime")),
-        "celex_grundlag":  _parse_celex_grundlag(
+        "ikraft_grundforfattning": _datum_api(kalla.get("ikraftDateTime")),
+        "celex_grundforfattning":  _parse_celex_grundforfattning(
             kalla.get("register", {}).get("celexnummer")
         ),
         "cache_source":    "api",
@@ -508,10 +508,10 @@ def _parsa_sfsr_html(html: str, sfs_nr: str) -> dict:
     from bs4 import BeautifulSoup
     soup = BeautifulSoup(html, "html.parser")
 
-    # -- Grundlagsmetadata --
+    # -- Grundförfattningsmetadata --
     rubrik = None
-    ikraft_grundlag = None
-    celex_grundlag_lista: list[str] = []
+    ikraft_grundforfattning = None
+    celex_grundforfattning_lista: list[str] = []
 
     huvud = soup.find("div", class_="result-inner-box")
     if huvud:
@@ -529,13 +529,13 @@ def _parsa_sfsr_html(html: str, sfs_nr: str) -> dict:
             if etikett and varde.startswith(etikett):
                 varde = varde[len(etikett):].lstrip(":").strip()
             if etikett == "Ikraft":
-                ikraft_grundlag, _ = _parse_ikraft_html(varde)
+                ikraft_grundforfattning, _ = _parse_ikraft_html(varde)
             elif etikett == "CELEX-nr":
                 celex_str = _parse_celex_html(varde)
                 if celex_str:
-                    celex_grundlag_lista.extend(celex_str.split(","))
+                    celex_grundforfattning_lista.extend(celex_str.split(","))
 
-    celex_grundlag = "\n".join(celex_grundlag_lista) if celex_grundlag_lista else None
+    celex_grundforfattning = "\n".join(celex_grundforfattning_lista) if celex_grundforfattning_lista else None
 
     # -- Ändringar --
     andringar = []
@@ -585,8 +585,8 @@ def _parsa_sfsr_html(html: str, sfs_nr: str) -> dict:
     return {
         "sfs_nr":          sfs_nr,
         "rubrik":          rubrik,
-        "ikraft_grundlag": ikraft_grundlag,
-        "celex_grundlag":  celex_grundlag,
+        "ikraft_grundforfattning": ikraft_grundforfattning,
+        "celex_grundforfattning":  celex_grundforfattning,
         "cache_source":    "html",
         "andringar":       andringar,
     }
@@ -605,7 +605,7 @@ def hamta_lag(sfs_nr: str, tvinga_uppdatering: bool = False) -> dict:
         tvinga_uppdatering: Om True hoppas cache-kontrollen över
 
     Returns:
-        Dict med sfs_nr, rubrik, ikraft_grundlag, celex_grundlag, andringar
+        Dict med sfs_nr, rubrik, ikraft_grundforfattning, celex_grundforfattning, andringar
     """
     sfs_nr = _normalisera_sfs(sfs_nr)
 

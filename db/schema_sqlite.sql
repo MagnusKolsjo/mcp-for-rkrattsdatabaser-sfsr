@@ -5,19 +5,19 @@
 -- =============================================================================
 
 -- ---------------------------------------------------------------------------
--- sfsr_laws: metadata för varje grundlag (ett SFS-nummer = en rad)
+-- sfsr_laws: metadata för varje grundförfattning (ett SFS-nummer = en rad)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS sfsr_laws (
     sfs_nr              TEXT        PRIMARY KEY,
     rubrik              TEXT,
-    ikraft_grundlag     TEXT,                   -- datum som TEXT (SQLite har ingen DATE-typ)
-    celex_grundlag      TEXT,
+    ikraft_grundforfattning     TEXT,                   -- datum som TEXT (SQLite har ingen DATE-typ)
+    celex_grundforfattning      TEXT,
     cached_at           TEXT        NOT NULL DEFAULT (datetime('now')),
     cache_source        TEXT        NOT NULL DEFAULT 'api'
 );
 
 -- ---------------------------------------------------------------------------
--- sfsr_amendments: ändrings-SFS per grundlag
+-- sfsr_amendments: ändrings-SFS per grundförfattning
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS sfsr_amendments (
     id                      INTEGER     PRIMARY KEY AUTOINCREMENT,

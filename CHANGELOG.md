@@ -6,6 +6,27 @@ Versionshanteringen följer [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.0.0] — 2026-05-03
+
+### Changed (brytande)
+
+- Kolumnen `ikraft_grundlag` i `sfsr_laws` döpt om till `ikraft_grundforfattning`
+- Kolumnen `celex_grundlag` i `sfsr_laws` döpt om till `celex_grundforfattning`
+- JSON-fälten `ikraft_grundlag` och `celex_grundlag` i MCP-verktygssvar döpta
+  om till `ikraft_grundforfattning` respektive `celex_grundforfattning`
+
+### Fixed
+
+- Terminologifel genomgående i kod och dokumentation: "grundlag" (konstitution)
+  användes felaktigt som synonym för "grundförfattning" (den ursprungliga lag som
+  ändringsposterna avser). Grundlag avser enbart de fyra konstitutionella lagarna
+  (RF, SO, TF, YGL) och får inte användas i vidare betydelse.
+
+### Added
+
+- `db/migration_v2_0_0.sql` — migrationsskript som döper om kolumnerna i
+  befintliga PostgreSQL-databaser (SQLite-instruktioner inkluderade som kommentar)
+
 ## [1.0.0] — 2026-05-03
 
 ### Added

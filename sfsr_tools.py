@@ -21,17 +21,17 @@ def sfsr_get_law_history(sfs_nr: str) -> dict:
     """
     Hämtar hela ändringshistoriken för en lag.
 
-    Returnerar metadata om grundlagen samt en kronologisk lista av alla
+    Returnerar metadata om grundförfattningen samt en kronologisk lista av alla
     ändrings-SFS, med ikraftträdandedatum, berörda paragrafer och förarbeten.
 
     Args:
-        sfs_nr:               SFS-nummer för grundlagen, t.ex. "1993:1617"
+        sfs_nr:               SFS-nummer för grundförfattningen, t.ex. "1993:1617"
     Returns:
         {
           "sfs_nr":          str,
           "rubrik":          str | None,
-          "ikraft_grundlag": str | None,   # ÅÅÅÅ-MM-DD
-          "celex_grundlag":  str | None,   # radbrytningsseparerade CELEX-nr
+          "ikraft_grundforfattning": str | None,   # ÅÅÅÅ-MM-DD
+          "celex_grundforfattning":  str | None,   # radbrytningsseparerade CELEX-nr
           "antal_andringar": int,
           "andringar": [
             {
@@ -62,8 +62,8 @@ def sfsr_get_law_history(sfs_nr: str) -> dict:
     return {
         "sfs_nr":          data["sfs_nr"],
         "rubrik":          data.get("rubrik"),
-        "ikraft_grundlag": data.get("ikraft_grundlag"),
-        "celex_grundlag":  data.get("celex_grundlag"),
+        "ikraft_grundforfattning": data.get("ikraft_grundforfattning"),
+        "celex_grundforfattning":  data.get("celex_grundforfattning"),
         "antal_andringar": len(andringar_ut),
         "andringar":       andringar_ut,
     }
@@ -220,7 +220,7 @@ def sfsr_get_paragraph_history(sfs_nr: str, paragraf: str) -> list[dict]:
     Filtrerar ändringshistoriken till de poster som berör en specifik paragraf.
 
     Args:
-        sfs_nr:   SFS-nummer för grundlagen, t.ex. "1993:1617"
+        sfs_nr:   SFS-nummer för grundförfattningen, t.ex. "1993:1617"
         paragraf: Paragrafbeteckning, t.ex. "2 kap. 8 §" eller "3 §"
 
     Returns:

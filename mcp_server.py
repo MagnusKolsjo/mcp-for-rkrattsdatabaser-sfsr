@@ -68,14 +68,14 @@ def sfsr_get_law_history(sfs_nr: str) -> str:
     """
     Hämtar hela ändringshistoriken för en lag från SFSR.
 
-    Returnerar metadata om grundlagen samt en kronologisk lista av alla
+    Returnerar metadata om grundförfattningen samt en kronologisk lista av alla
     ändrings-SFS, med ikraftträdandedatum, berörda paragrafer och förarbeten
     (proposition, betänkande, riksdagsskrivelse).
 
     Parametrar:
-      sfs_nr               — SFS-nummer för grundlagen, t.ex. "1993:1617"
+      sfs_nr               — SFS-nummer för grundförfattningen, t.ex. "1993:1617"
     Returnerar JSON med fälten:
-      sfs_nr, rubrik, ikraft_grundlag, celex_grundlag,
+      sfs_nr, rubrik, ikraft_grundforfattning, celex_grundforfattning,
       antal_andringar, andringar (lista)
 
     Varje ändring innehåller: andrings_sfs, rubrik, ikrafttradande,
@@ -101,7 +101,7 @@ def sfsr_get_paragraph_history(
     t.ex. vilka propositioner som lett till att paragrafen ändrats och när.
 
     Parametrar:
-      sfs_nr   — SFS-nummer för grundlagen, t.ex. "1993:1617"
+      sfs_nr   — SFS-nummer för grundförfattningen, t.ex. "1993:1617"
       paragraf — paragrafbeteckning, t.ex. "2 kap. 8 §" eller "3 §"
 
     Returnerar JSON-lista av ändrings-SFS i kronologisk ordning.
@@ -135,7 +135,7 @@ def sfsr_trace_chain(
     fullständig spårbarhet från gällande rätt tillbaka till ursprungsproposition.
 
     Parametrar:
-      sfs_nr  — SFS-nummer för grundlagen, t.ex. "1993:1617"
+      sfs_nr  — SFS-nummer för grundförfattningen, t.ex. "1993:1617"
       paragraf — om angiven filtreras kedjan till ändringar som rör just
                  den paragrafen, t.ex. "2 kap. 8 §"
       djup    — max antal kedjeled att följa (standard: 5, max: 20)

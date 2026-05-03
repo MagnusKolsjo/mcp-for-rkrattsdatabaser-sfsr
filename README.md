@@ -129,7 +129,7 @@ sfsr_get_law_history(sfs_nr: str, inkludera_historiska: bool = False)
 ```
 
 Hämtar alla ändrings-SFS för en lag, kronologiskt sorterade. Returnerar metadata
-om grundlagen (rubrik, ikraftträdandedatum, CELEX-nummer) samt för varje ändring:
+om grundförfattningen (rubrik, ikraftträdandedatum, CELEX-nummer) samt för varje ändring:
 ändrings-SFS, ikraftträdandedatum, berörda paragrafer, proposition, betänkande,
 riksdagsskrivelse och CELEX-nummer.
 
