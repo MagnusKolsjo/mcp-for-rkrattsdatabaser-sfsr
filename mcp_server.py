@@ -64,10 +64,7 @@ from sfsr_tools import sfsr_get_paragraph_history as _get_paragraph_history
 
 
 @mcp.tool()
-def sfsr_get_law_history(
-    sfs_nr: str,
-    inkludera_historiska: bool = False,
-) -> str:
+def sfsr_get_law_history(sfs_nr: str) -> str:
     """
     Hämtar hela ändringshistoriken för en lag från SFSR.
 
@@ -77,8 +74,6 @@ def sfsr_get_law_history(
 
     Parametrar:
       sfs_nr               — SFS-nummer för grundlagen, t.ex. "1993:1617"
-      inkludera_historiska — om True inkluderas historiska poster (standard: False)
-
     Returnerar JSON med fälten:
       sfs_nr, rubrik, ikraft_grundlag, celex_grundlag,
       antal_andringar, andringar (lista)
@@ -87,7 +82,7 @@ def sfsr_get_law_history(
     paragrafer, prop, bet, rskr, celex, eu_direktiv, overgangsbestammelse.
     """
     try:
-        resultat = _get_law_history(sfs_nr, inkludera_historiska=inkludera_historiska)
+        resultat = _get_law_history(sfs_nr)
         return json.dumps(resultat, ensure_ascii=False, indent=2)
     except Exception as e:
         log.exception("Fel i sfsr_get_law_history för %s", sfs_nr)

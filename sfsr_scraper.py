@@ -376,12 +376,16 @@ def _till_datamodell_api(kalla: dict, sfs_nr: str) -> dict:
         prop = bet = rskr = None
         for del_ in re.split(r"[,;\n]+", text):
             del_ = del_.strip()
-            if del_.startswith("prop."):
-                prop = del_
-            elif del_.startswith("bet."):
-                bet = del_
-            elif del_.startswith("rskr."):
-                rskr = del_
+            # API:et returnerar "Prop." med stor bokstav — jämför case-insensitivt
+            # men normalisera bara prefixet till gemener; resten bevaras som det är
+            # så att utskottsbeteckningar (JuU, KU, FöU m.fl.) behåller korrekt stil.
+            del_lower = del_.lower()
+            if del_lower.startswith("prop."):
+                prop = "prop." + del_[5:]
+            elif del_lower.startswith("bet."):
+                bet = "bet." + del_[4:]
+            elif del_lower.startswith("rskr."):
+                rskr = "rskr." + del_[5:]
         return prop, bet, rskr
 
     prop_g, bet_g, rskr_g = _forarbeten(kalla.get("register", {}).get("forarbeten"))
