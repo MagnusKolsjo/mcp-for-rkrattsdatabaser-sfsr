@@ -6,6 +6,46 @@ Versionshanteringen följer [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.0.0] — 2026-05-06
+
+### Brytande ändringar — databas och Python-API
+
+**Databas-rename i schemat `sfsr`** — kräver migration via
+`db/migration_v3_0_0.sql`. Skriptet är idempotent och säkert att köra om.
+
+Tabeller:
+- `sfsr_laws` → `sfsr_lagar`
+- `sfsr_amendments` → `sfsr_andringar`
+
+Kolumner i `sfsr.sfsr_lagar`:
+- `cached_at` → `cachad_vid`
+- `cache_source` → `cache_kalla`
+
+**Python-identifierare** — 13 unika identifierare med å/ä/ö flyttade till
+ASCII-svenska. Berörda filer: `01_explore_sfsr.py` och `02_explore_sfsr_api.py`
+(utforskningsskript). Bland byten:
+- `hämta_sfsr` → `hamta_sfsr`
+- `hämta_via_api` → `hamta_via_api`
+- `_parse_celex_ändring` → `_parse_celex_andring`
+- `_parse_förarbeten` → `_parse_forarbeten`
+- `råa_ändringar` → `raa_andringar`
+- `källdata` → `kalldata`
+- `värde` → `varde`
+- `med_överg` → `med_overg`
+
+Kärnkoden (`mcp_server.py`, `sfsr_tools.py`, `sfsr_scraper.py`, `db/init_db.py`)
+hade inga identifierare med å/ä/ö — bara SQL-strängarna behövde uppdateras med
+nya tabell- och kolumnnamn.
+
+### Tekniskt
+
+- Ny `db/migration_v3_0_0.sql` med PL/pgSQL-helperfunktioner
+  `pg_temp.byt_tabell` och `pg_temp.byt_kolumn` som är idempotenta.
+- `db/schema_postgres.sql` och `db/schema_sqlite.sql` uppdaterade — nya
+  installationer skapas direkt med svenska namn.
+
+
+
 ## [2.0.0] — 2026-05-03
 
 ### Changed (brytande)

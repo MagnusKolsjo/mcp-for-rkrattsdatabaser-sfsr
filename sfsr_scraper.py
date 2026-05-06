@@ -98,29 +98,29 @@ def _cache_giltig(sfs_nr: str) -> bool:
         conn = _get_pg_conn()
         with conn.cursor() as cur:
             cur.execute(
-                f"SELECT cached_at FROM {p}sfsr_laws WHERE sfs_nr = %s",
+                f"SELECT cachad_vid FROM {p}sfsr_lagar WHERE sfs_nr = %s",
                 (sfs_nr,)
             )
             rad = cur.fetchone()
         conn.close()
         if rad is None:
             return False
-        cached_at = rad[0]
-        if cached_at.tzinfo is None:
-            cached_at = cached_at.replace(tzinfo=timezone.utc)
-        return cached_at >= ttl_grans
+        cachad_vid = rad[0]
+        if cachad_vid.tzinfo is None:
+            cachad_vid = cachad_vid.replace(tzinfo=timezone.utc)
+        return cachad_vid >= ttl_grans
     else:
         conn = _get_sqlite_conn()
         cur = conn.execute(
-            f"SELECT cached_at FROM {p}sfsr_laws WHERE sfs_nr = ?",
+            f"SELECT cachad_vid FROM {p}sfsr_lagar WHERE sfs_nr = ?",
             (sfs_nr,)
         )
         rad = cur.fetchone()
         conn.close()
         if rad is None:
             return False
-        cached_at = datetime.fromisoformat(rad[0]).replace(tzinfo=timezone.utc)
-        return cached_at >= ttl_grans
+        cachad_vid = datetime.fromisoformat(rad[0]).replace(tzinfo=timezone.utc)
+        return cachad_vid >= ttl_grans
 
 
 def _spara_i_cache(data: dict) -> None:
@@ -134,11 +134,11 @@ def _spara_i_cache(data: dict) -> None:
         conn.autocommit = False
         try:
             with conn.cursor() as cur:
-                # Radera gamla poster (CASCADE tar hand om sfsr_amendments)
-                cur.execute(f"DELETE FROM {p}sfsr_laws WHERE sfs_nr = %s", (sfs_nr,))
+                # Radera gamla poster (CASCADE tar hand om sfsr_andringar)
+                cur.execute(f"DELETE FROM {p}sfsr_lagar WHERE sfs_nr = %s", (sfs_nr,))
                 cur.execute(
-                    f"""INSERT INTO {p}sfsr_laws
-                        (sfs_nr, rubrik, ikraft_grundforfattning, celex_grundforfattning, cached_at, cache_source)
+                    f"""INSERT INTO {p}sfsr_lagar
+                        (sfs_nr, rubrik, ikraft_grundforfattning, celex_grundforfattning, cachad_vid, cache_kalla)
                         VALUES (%s, %s, %s, %s, %s, %s)""",
                     (
                         sfs_nr,
@@ -146,12 +146,12 @@ def _spara_i_cache(data: dict) -> None:
                         data.get("ikraft_grundforfattning"),
                         data.get("celex_grundforfattning"),
                         nu,
-                        data.get("cache_source", SFSR_BACKEND),
+                        data.get("cache_kalla", SFSR_BACKEND),
                     ),
                 )
                 for a in data.get("andringar", []):
                     cur.execute(
-                        f"""INSERT INTO {p}sfsr_amendments
+                        f"""INSERT INTO {p}sfsr_andringar
                             (sfs_nr, andrings_sfs, rubrik, ikrafttradande, paragrafer,
                              prop, bet, rskr, celex, eu_direktiv, overgangsbestammelse,
                              historisk, borttagen)
@@ -179,10 +179,10 @@ def _spara_i_cache(data: dict) -> None:
         conn = _get_sqlite_conn()
         conn.execute("PRAGMA foreign_keys = ON")
         try:
-            conn.execute(f"DELETE FROM {p}sfsr_laws WHERE sfs_nr = ?", (sfs_nr,))
+            conn.execute(f"DELETE FROM {p}sfsr_lagar WHERE sfs_nr = ?", (sfs_nr,))
             conn.execute(
-                f"""INSERT INTO {p}sfsr_laws
-                    (sfs_nr, rubrik, ikraft_grundforfattning, celex_grundforfattning, cached_at, cache_source)
+                f"""INSERT INTO {p}sfsr_lagar
+                    (sfs_nr, rubrik, ikraft_grundforfattning, celex_grundforfattning, cachad_vid, cache_kalla)
                     VALUES (?,?,?,?,?,?)""",
                 (
                     sfs_nr,
@@ -190,12 +190,12 @@ def _spara_i_cache(data: dict) -> None:
                     data.get("ikraft_grundforfattning"),
                     data.get("celex_grundforfattning"),
                     nu,
-                    data.get("cache_source", SFSR_BACKEND),
+                    data.get("cache_kalla", SFSR_BACKEND),
                 ),
             )
             for a in data.get("andringar", []):
                 conn.execute(
-                    f"""INSERT INTO {p}sfsr_amendments
+                    f"""INSERT INTO {p}sfsr_andringar
                         (sfs_nr, andrings_sfs, rubrik, ikrafttradande, paragrafer,
                          prop, bet, rskr, celex, eu_direktiv, overgangsbestammelse,
                          historisk, borttagen)
@@ -222,14 +222,14 @@ def _spara_i_cache(data: dict) -> None:
 
 
 def _las_fran_cache(sfs_nr: str) -> dict | None:
-    """Läser en lag med alla dess ändringar från cachen."""
+    """Läser en lag med alla dess andringar från cachen."""
     p = _tabell_prefix()
 
     if _is_postgres():
         conn = _get_pg_conn()
         with conn.cursor() as cur:
             cur.execute(
-                f"SELECT sfs_nr, rubrik, ikraft_grundforfattning, celex_grundforfattning FROM {p}sfsr_laws WHERE sfs_nr = %s",
+                f"SELECT sfs_nr, rubrik, ikraft_grundforfattning, celex_grundforfattning FROM {p}sfsr_lagar WHERE sfs_nr = %s",
                 (sfs_nr,)
             )
             lag = cur.fetchone()
@@ -240,7 +240,7 @@ def _las_fran_cache(sfs_nr: str) -> dict | None:
                 f"""SELECT andrings_sfs, rubrik, ikrafttradande, paragrafer,
                            prop, bet, rskr, celex, eu_direktiv, overgangsbestammelse,
                            historisk, borttagen
-                    FROM {p}sfsr_amendments
+                    FROM {p}sfsr_andringar
                     WHERE sfs_nr = %s
                     ORDER BY ikrafttradande NULLS LAST, andrings_sfs""",
                 (sfs_nr,)
@@ -250,7 +250,7 @@ def _las_fran_cache(sfs_nr: str) -> dict | None:
     else:
         conn = _get_sqlite_conn()
         lag = conn.execute(
-            f"SELECT sfs_nr, rubrik, ikraft_grundforfattning, celex_grundforfattning FROM {p}sfsr_laws WHERE sfs_nr = ?",
+            f"SELECT sfs_nr, rubrik, ikraft_grundforfattning, celex_grundforfattning FROM {p}sfsr_lagar WHERE sfs_nr = ?",
             (sfs_nr,)
         ).fetchone()
         if lag is None:
@@ -260,7 +260,7 @@ def _las_fran_cache(sfs_nr: str) -> dict | None:
             f"""SELECT andrings_sfs, rubrik, ikrafttradande, paragrafer,
                        prop, bet, rskr, celex, eu_direktiv, overgangsbestammelse,
                        historisk, borttagen
-                FROM {p}sfsr_amendments
+                FROM {p}sfsr_andringar
                 WHERE sfs_nr = ?
                 ORDER BY COALESCE(ikrafttradande, '9999-12-31'), andrings_sfs""",
             (sfs_nr,)
@@ -346,7 +346,7 @@ def _parse_celex_grundforfattning(text: str | None) -> str | None:
 
 
 def _parse_celex_andring(text: str | None) -> str | None:
-    """Parsar CELEX-nummer för en ändring (komma- eller blankstegseparerade)."""
+    """Parsar CELEX-nummer för en andring (komma- eller blankstegseparerade)."""
     if not text:
         return None
     text = text.strip()
@@ -424,7 +424,7 @@ def _till_datamodell_api(kalla: dict, sfs_nr: str) -> dict:
         "celex_grundforfattning":  _parse_celex_grundforfattning(
             kalla.get("register", {}).get("celexnummer")
         ),
-        "cache_source":    "api",
+        "cache_kalla":    "api",
         "andringar":       andringar,
     }
 
@@ -466,12 +466,12 @@ def _parse_ikraft_html(text: str) -> tuple[str | None, bool]:
     """
     Parsar ikraftträdandetext och returnerar (datum, har_overgangsbestammelse).
 
-    Övergångsbestämmelse (överg.best.) anger regler för hur skiftet mellan
+    Övergångsbestämmelse (overg.best.) anger regler för hur skiftet mellan
     gammal och ny bestämmelse ska hanteras — t.ex. att pågående mål avgörs
     enligt äldre rätt.
     """
-    overg = "överg.best." in text.lower()
-    datumtext = re.sub(r"överg\.best\.", "", text, flags=re.IGNORECASE).strip()
+    overg = "overg.best." in text.lower()
+    datumtext = re.sub(r"overg\.best\.", "", text, flags=re.IGNORECASE).strip()
     datummatch = re.search(r"\d{4}-\d{2}-\d{2}", datumtext)
     datum = datummatch.group(0) if datummatch else None
     return datum, overg
@@ -587,7 +587,7 @@ def _parsa_sfsr_html(html: str, sfs_nr: str) -> dict:
         "rubrik":          rubrik,
         "ikraft_grundforfattning": ikraft_grundforfattning,
         "celex_grundforfattning":  celex_grundforfattning,
-        "cache_source":    "html",
+        "cache_kalla":    "html",
         "andringar":       andringar,
     }
 

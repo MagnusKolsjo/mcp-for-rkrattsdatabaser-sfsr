@@ -18,8 +18,8 @@ Bakgrund:
 
 Testlagar:
   SFS 1993:1617 — Ordningslag (liten lag, ett CELEX-nr)
-  SFS 1998:808  — Miljöbalk (stor lag, 173 ändringar, många CELEX-nr)
-  SFS 1942:740  — Rättegångsbalk (396 ändringar, gammal lag, rubrik=None)
+  SFS 1998:808  — Miljöbalk (stor lag, 173 andringar, många CELEX-nr)
+  SFS 1942:740  — Rättegångsbalk (396 andringar, gammal lag, rubrik=None)
 
 Körning:
   pip install requests
@@ -29,10 +29,10 @@ Fynd från körning 2026-05-03:
   - API:et kräver ingen autentisering.
   - andringsforfattningar är INTE sorterade kronologiskt — sortera på
     ikraftDateTime eller beteckning i applikationskoden.
-  - rubrik kan vara None (ej bara tom sträng) för gamla ändringar.
-  - ikraftDateTime kan vara None (ändring av ikraftträdandebestämmelse).
+  - rubrik kan vara None (ej bara tom sträng) för gamla andringar.
+  - ikraftDateTime kan vara None (andring av ikraftträdandebestämmelse).
   - celexnummer på grundförfattningen är radbrytningsseparerade (\n).
-  - celexnummer på ändring är kommaseparerade (, ).
+  - celexnummer på andring är kommaseparerade (, ).
   - eUdirektiv är en separat bool-flagga (i tillägg till celexnummer).
   - ikraftOvergangsbestammelse är en riktig bool — ingen texttolkning krävs.
   - URL:en innehåller "beta." — uppdatera SFSR_API_BASE_URL i .env när
@@ -55,7 +55,7 @@ USER_AGENT = "Mozilla/5.0 (compatible; riksdag-mcp-bot/1.0)"
 TESTLAGAR = [
     ("1993:1617", "Ordningslag — liten lag, ett CELEX-nr"),
     ("1998:808",  "Miljöbalk — stor lag, många CELEX-nr"),
-    ("1942:740",  "Rättegångsbalk — 396 ändringar, gammal lag"),
+    ("1942:740",  "Rättegångsbalk — 396 andringar, gammal lag"),
 ]
 
 
@@ -63,7 +63,7 @@ TESTLAGAR = [
 # API-anrop
 # ---------------------------------------------------------------------------
 
-def hämta_via_api(beteckning: str) -> dict | None:
+def hamta_via_api(beteckning: str) -> dict | None:
     """
     Hämtar en lag från beta-API:et via SFS-beteckning.
 
@@ -99,8 +99,8 @@ def hämta_via_api(beteckning: str) -> dict | None:
     if isinstance(hits, str):
         import json
         hits = json.loads(hits)
-    träffar = hits.get("hits", {}).get("hits", [])
-    return träffar[0]["_source"] if träffar else None
+    traffar = hits.get("hits", {}).get("hits", [])
+    return traffar[0]["_source"] if traffar else None
 
 
 # ---------------------------------------------------------------------------
@@ -114,7 +114,7 @@ def _datum(iso: str | None) -> str:
     return iso[:10]  # "2005-04-01T00:00:00" → "2005-04-01"
 
 
-def _parse_förarbeten(text: str | None) -> tuple[str, str, str]:
+def _parse_forarbeten(text: str | None) -> tuple[str, str, str]:
     """
     Extraherar prop, bet och rskr ur ett förarbeten-fält.
     Samma logik som i HTML-skraparen — fältet har samma textformat i API:et.
@@ -144,14 +144,14 @@ def _parse_celex_grundforfattning(text: str | None) -> list[str]:
     return [t.strip() for t in text.splitlines() if t.strip()]
 
 
-def _parse_celex_ändring(text: str | None) -> list[str]:
+def _parse_celex_andring(text: str | None) -> list[str]:
     """
-    Parsar CELEX-fältet på en ändring.
+    Parsar CELEX-fältet på en andring.
 
     Separatorn är inkonsekvent i API-svaret:
     - Komma (vanligast): "32000L0076, 32003R0304, ..."
     - Mellanslag (äldre poster): "387R2658 370L0220 388L0077"
-    - Enstaka värde: "32010L0075"
+    - Enstaka varde: "32010L0075"
     - EU-tidningsreferens (ej CELEX): "EUTL342/2009 s59" — behålls som-är
 
     Strategi: om komma förekommer, dela på komma, annars på mellanslag.
@@ -163,7 +163,7 @@ def _parse_celex_ändring(text: str | None) -> list[str]:
     return [t.strip() for t in text.split() if t.strip()]
 
 
-def till_datamodell(källdata: dict) -> dict:
+def till_datamodell(kalldata: dict) -> dict:
     """
     Mappar ett API-svar mot datamodellen som definieras i arbetsström 8.
 
@@ -179,16 +179,16 @@ def till_datamodell(källdata: dict) -> dict:
       prop/bet/rskr        ← register.forarbeten (regex)
       celex (grundförfattning)     ← register.celexnummer (radbrytning-sep.)
       andrings_sfs         ← andringsforfattningar[n].beteckning
-      rubrik (ändring)     ← andringsforfattningar[n].rubrik (kan vara None)
+      rubrik (andring)     ← andringsforfattningar[n].rubrik (kan vara None)
       omfattning           ← andringsforfattningar[n].anteckningar
       ikrafttradande       ← andringsforfattningar[n].ikraftDateTime (ISO → datum)
       overgangsbestammelse ← andringsforfattningar[n].ikraftOvergangsbestammelse (bool)
       prop/bet/rskr        ← andringsforfattningar[n].forarbeten (regex)
-      celex (ändring)      ← andringsforfattningar[n].celexnummer (komma-sep.)
+      celex (andring)      ← andringsforfattningar[n].celexnummer (komma-sep.)
     """
-    reg = källdata.get("register", {})
-    org = källdata.get("organisation", {})
-    prop, bet, rskr = _parse_förarbeten(reg.get("forarbeten"))
+    reg = kalldata.get("register", {})
+    org = kalldata.get("organisation", {})
+    prop, bet, rskr = _parse_forarbeten(reg.get("forarbeten"))
 
     # Ändringar — API:et ger dem i intern ordning, inte kronologisk.
     # Sorterar på ikraftDateTime (None-värden sist), sedan beteckning.
@@ -198,15 +198,15 @@ def till_datamodell(källdata: dict) -> dict:
         dt = a.get("ikraftDateTime") or "9999-12-31"
         return (dt, a.get("beteckning", ""))
 
-    råa_ändringar = sorted(
-        källdata.get("andringsforfattningar", []),
+    raa_andringar = sorted(
+        kalldata.get("andringsforfattningar", []),
         key=sorteringsnyckel
     )
 
-    ändringar = []
-    for a in råa_ändringar:
-        ap, ab, ar = _parse_förarbeten(a.get("forarbeten"))
-        ändringar.append({
+    andringar = []
+    for a in raa_andringar:
+        ap, ab, ar = _parse_forarbeten(a.get("forarbeten"))
+        andringar.append({
             "andrings_sfs":         a.get("beteckning", ""),
             "rubrik":               a.get("rubrik") or "",  # None → ""
             "omfattning":           a.get("anteckningar") or "",
@@ -215,19 +215,19 @@ def till_datamodell(källdata: dict) -> dict:
             "prop":                 ap,
             "bet":                  ab,
             "rskr":                 ar,
-            "celex":                _parse_celex_ändring(a.get("celexnummer")),
+            "celex":                _parse_celex_andring(a.get("celexnummer")),
         })
 
     return {
-        "sfs_nr":      källdata.get("beteckning", ""),
-        "rubrik":      källdata.get("rubrik", ""),
+        "sfs_nr":      kalldata.get("beteckning", ""),
+        "rubrik":      kalldata.get("rubrik", ""),
         "departement": org.get("namnOchEnhet", ""),
-        "ikraft":      _datum(källdata.get("ikraftDateTime")),
+        "ikraft":      _datum(kalldata.get("ikraftDateTime")),
         "prop":        prop,
         "bet":         bet,
         "rskr":        rskr,
         "celex":       _parse_celex_grundforfattning(reg.get("celexnummer")),
-        "ändringar":   ändringar,
+        "andringar":   andringar,
     }
 
 
@@ -242,16 +242,16 @@ def rapport(beteckning: str, beskrivning: str) -> None:
     print(f"{'='*60}")
 
     try:
-        källdata = hämta_via_api(beteckning)
+        kalldata = hamta_via_api(beteckning)
     except requests.RequestException as e:
         print(f"  FEL vid API-anrop: {e}")
         return
 
-    if källdata is None:
+    if kalldata is None:
         print(f"  Lagen hittades inte i API:et.")
         return
 
-    data = till_datamodell(källdata)
+    data = till_datamodell(kalldata)
 
     print(f"  Rubrik:        {data['rubrik']}")
     print(f"  Departement:   {data['departement']}")
@@ -259,26 +259,26 @@ def rapport(beteckning: str, beskrivning: str) -> None:
     print(f"  Prop (lag):    {data['prop']}")
     print(f"  CELEX (lag):   {len(data['celex'])} nummer")
 
-    änd = data["ändringar"]
-    print(f"\n  Antal ändringar: {len(änd)}")
+    andringar = data["andringar"]
+    print(f"\n  Antal andringar: {len(andringar)}")
 
-    med_celex     = [a for a in änd if a["celex"]]
-    med_överg     = [a for a in änd if a["overgangsbestammelse"]]
-    saknar_rubrik = [a for a in änd if not a["rubrik"]]
-    saknar_ikraft = [a for a in änd if not a["ikrafttradande"]]
+    med_celex     = [a for a in andringar if a["celex"]]
+    med_overg     = [a for a in andringar if a["overgangsbestammelse"]]
+    saknar_rubrik = [a for a in andringar if not a["rubrik"]]
+    saknar_ikraft = [a for a in andringar if not a["ikrafttradande"]]
 
     print(f"  Varav med CELEX-nr:         {len(med_celex)}")
-    print(f"  Varav med överg.best.:      {len(med_överg)}")
+    print(f"  Varav med overg.best.:      {len(med_overg)}")
     print(f"  Saknar rubrik:              {len(saknar_rubrik)}")
     print(f"  Saknar ikraft-datum:        {len(saknar_ikraft)}")
 
-    if änd:
-        print(f"\n  Första ändring (kronologisk):")
-        for k, v in änd[0].items():
+    if andringar:
+        print(f"\n  Första andring (kronologisk):")
+        for k, v in andringar[0].items():
             print(f"    {k}: {v}")
-        if len(änd) > 1:
-            print(f"\n  Senaste ändring (#{len(änd)}):")
-            for k, v in änd[-1].items():
+        if len(andringar) > 1:
+            print(f"\n  Senaste andring (#{len(andringar)}):")
+            for k, v in andringar[-1].items():
                 print(f"    {k}: {v}")
 
     if med_celex:
@@ -307,17 +307,17 @@ def main() -> None:
      Sortera på ikraftDateTime + beteckning i applikationskoden.
      None-värden (ingen ikraft) placeras sist med fallback '9999-12-31'.
 
-  2. rubrik kan vara None (inte bara tom sträng) för gamla ändringar.
+  2. rubrik kan vara None (inte bara tom sträng) för gamla andringar.
      Normaliseras till "" i till_datamodell().
 
   3. ikraftDateTime kan vara None. Normaliseras till "" i _datum().
 
   4. celexnummer på grundförfattningen: radbrytningsseparerade (\n).
-     celexnummer på ändring: kommaseparerade (, ).
+     celexnummer på andring: kommaseparerade (, ).
      Skilda parsningsfunktioner krävs.
 
   5. ikraftOvergangsbestammelse är en riktig bool — ingen texttolkning.
-     I HTML-skraparen krävde "överg.best." textmatchning.
+     I HTML-skraparen krävde "overg.best." textmatchning.
 
   6. eUdirektiv är en separat bool-flagga på ändringsposten.
      Finns inte i HTML-skrapningens datamodell — lägg till i schemat.

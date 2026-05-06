@@ -7,7 +7,7 @@ mcp_server.py — MCP-server för SFSR ändringsregister
 
 Exponerar tre verktyg till MCP-kompatibla AI-verktyg:
   sfsr_get_law_history       — hela ändringshistoriken för en lag
-  sfsr_get_paragraph_history — ändringar som berör en specifik paragraf
+  sfsr_get_paragraph_history — andringar som berör en specifik paragraf
   sfsr_trace_chain           — följer ändringskedjan bakåt (med propositionsreferenser)
 
 Krav:
@@ -78,7 +78,7 @@ def sfsr_get_law_history(sfs_nr: str) -> str:
       sfs_nr, rubrik, ikraft_grundforfattning, celex_grundforfattning,
       antal_andringar, andringar (lista)
 
-    Varje ändring innehåller: andrings_sfs, rubrik, ikrafttradande,
+    Varje andring innehåller: andrings_sfs, rubrik, ikrafttradande,
     paragrafer, prop, bet, rskr, celex, eu_direktiv, overgangsbestammelse.
     """
     try:
@@ -107,7 +107,7 @@ def sfsr_get_paragraph_history(
     Returnerar JSON-lista av ändrings-SFS i kronologisk ordning.
     Varje post innehåller: andrings_sfs, rubrik, ikrafttradande,
     paragrafer, prop, bet, rskr, celex, eu_direktiv, overgangsbestammelse.
-    Tom lista om inga träffar.
+    Tom lista om inga traffar.
 
     Tips: hämta först hela historiken med sfsr_get_law_history för att se
     vilka paragrafer som ändrats och hur de är betecknade i SFSR.
@@ -136,7 +136,7 @@ def sfsr_trace_chain(
 
     Parametrar:
       sfs_nr  — SFS-nummer för grundförfattningen, t.ex. "1993:1617"
-      paragraf — om angiven filtreras kedjan till ändringar som rör just
+      paragraf — om angiven filtreras kedjan till andringar som rör just
                  den paragrafen, t.ex. "2 kap. 8 §"
       djup    — max antal kedjeled att följa (standard: 5, max: 20)
 

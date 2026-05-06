@@ -226,7 +226,7 @@ def sfsr_get_paragraph_history(sfs_nr: str, paragraf: str) -> list[dict]:
     Returns:
         Lista av ändrings-SFS (samma fältuppsättning som i sfsr_get_law_history)
         som berörs av den angivna paragrafen, i kronologisk ordning.
-        Tom lista om inga träffar.
+        Tom lista om inga traffar.
     """
     data = hamta_lag(sfs_nr)
     # Normalisera söktermen för att hantera naturliga uttryck

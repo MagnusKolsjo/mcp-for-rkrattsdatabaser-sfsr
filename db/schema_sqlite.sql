@@ -5,23 +5,23 @@
 -- =============================================================================
 
 -- ---------------------------------------------------------------------------
--- sfsr_laws: metadata för varje grundförfattning (ett SFS-nummer = en rad)
+-- sfsr_lagar: metadata för varje grundförfattning (ett SFS-nummer = en rad)
 -- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS sfsr_laws (
+CREATE TABLE IF NOT EXISTS sfsr_lagar (
     sfs_nr              TEXT        PRIMARY KEY,
     rubrik              TEXT,
     ikraft_grundforfattning     TEXT,                   -- datum som TEXT (SQLite har ingen DATE-typ)
     celex_grundforfattning      TEXT,
-    cached_at           TEXT        NOT NULL DEFAULT (datetime('now')),
-    cache_source        TEXT        NOT NULL DEFAULT 'api'
+    cachad_vid           TEXT        NOT NULL DEFAULT (datetime('now')),
+    cache_kalla        TEXT        NOT NULL DEFAULT 'api'
 );
 
 -- ---------------------------------------------------------------------------
--- sfsr_amendments: ändrings-SFS per grundförfattning
+-- sfsr_andringar: ändrings-SFS per grundförfattning
 -- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS sfsr_amendments (
+CREATE TABLE IF NOT EXISTS sfsr_andringar (
     id                      INTEGER     PRIMARY KEY AUTOINCREMENT,
-    sfs_nr                  TEXT        NOT NULL REFERENCES sfsr_laws (sfs_nr) ON DELETE CASCADE,
+    sfs_nr                  TEXT        NOT NULL REFERENCES sfsr_lagar (sfs_nr) ON DELETE CASCADE,
     andrings_sfs            TEXT        NOT NULL,
     rubrik                  TEXT,
     ikrafttradande          TEXT,               -- datum som TEXT
@@ -37,10 +37,10 @@ CREATE TABLE IF NOT EXISTS sfsr_amendments (
 );
 
 CREATE INDEX IF NOT EXISTS idx_sfsr_amendments_sfs_nr
-    ON sfsr_amendments (sfs_nr);
+    ON sfsr_andringar (sfs_nr);
 
 CREATE INDEX IF NOT EXISTS idx_sfsr_amendments_andrings_sfs
-    ON sfsr_amendments (andrings_sfs);
+    ON sfsr_andringar (andrings_sfs);
 
 CREATE INDEX IF NOT EXISTS idx_sfsr_amendments_ikrafttradande
-    ON sfsr_amendments (ikrafttradande);
+    ON sfsr_andringar (ikrafttradande);
