@@ -3,8 +3,8 @@
 Utforskningsskript för beta-API:et på beta.rkrattsbaser.gov.se.
 
 Dokumenterar hur API-anropen ser ut, testar kantfall och visar hur
-API-svaret mappas mot datamodellen i arbetsström 8. Används som
-referens när mcp_server.py implementeras med SFSR_BACKEND=api.
+API-svaret mappas mot datamodellen. Används som referens när
+mcp_server.py implementeras med SFSR_BACKEND=api.
 
 API-endpoint (POST):
   https://beta.rkrattsbaser.gov.se/elasticsearch/SearchEsByRawJson
@@ -13,8 +13,8 @@ Bakgrund:
   beta.rkrattsbaser.gov.se är en JavaScript-SPA som anropar detta
   Elasticsearch-API internt. "Beta" avser att inte alla databaser
   är migrerade ännu — inte att tekniken är instabil. SFSR-databasen
-  (den vi behöver) är fullt migrerad. API:et är primärkälla i
-  arbetsström 8; HTML-skrapningen (01_explore_sfsr.py) är fallback.
+  är fullt migrerad. API:et är primärkälla; HTML-skrapningen
+  (01_explore_sfsr.py) är det alternativa hämtningssättet.
 
 Testlagar:
   SFS 1993:1617 — Ordningslag (liten lag, ett CELEX-nr)
@@ -24,19 +24,6 @@ Testlagar:
 Körning:
   pip install requests
   python3 02_explore_sfsr_api.py
-
-Fynd från körning 2026-05-03:
-  - API:et kräver ingen autentisering.
-  - andringsforfattningar är INTE sorterade kronologiskt — sortera på
-    ikraftDateTime eller beteckning i applikationskoden.
-  - rubrik kan vara None (ej bara tom sträng) för gamla andringar.
-  - ikraftDateTime kan vara None (andring av ikraftträdandebestämmelse).
-  - celexnummer på grundförfattningen är radbrytningsseparerade (\n).
-  - celexnummer på andring är kommaseparerade (, ).
-  - eUdirektiv är en separat bool-flagga (i tillägg till celexnummer).
-  - ikraftOvergangsbestammelse är en riktig bool — ingen texttolkning krävs.
-  - URL:en innehåller "beta." — uppdatera SFSR_API_BASE_URL i .env när
-    beta-sajten blir produktion (troligen bara ta bort "beta.").
 """
 
 import re
@@ -50,7 +37,7 @@ import requests
 
 SFSR_API_BASE_URL = "https://beta.rkrattsbaser.gov.se"
 SFSR_API_ENDPOINT = f"{SFSR_API_BASE_URL}/elasticsearch/SearchEsByRawJson"
-USER_AGENT = "Mozilla/5.0 (compatible; riksdag-mcp-bot/1.0)"
+USER_AGENT = "mcp-for-rkrattsdatabaser-sfsr/1.0 (+https://github.com/MagnusKolsjo/mcp-for-rkrattsdatabaser-sfsr)"
 
 TESTLAGAR = [
     ("1993:1617", "Ordningslag — liten lag, ett CELEX-nr"),
@@ -165,7 +152,7 @@ def _parse_celex_andring(text: str | None) -> list[str]:
 
 def till_datamodell(kalldata: dict) -> dict:
     """
-    Mappar ett API-svar mot datamodellen som definieras i arbetsström 8.
+    Mappar ett API-svar mot datamodellen.
 
     Returnerar samma struktur som parsa_sfsr() i 01_explore_sfsr.py,
     vilket gör att mcp_server.py kan kalla endera backend och få

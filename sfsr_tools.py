@@ -1,3 +1,7 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Magnus Kolsjö
+# Se LICENSE-filen i repots rot för fullständig licenstext.
+
 """
 sfsr_tools.py — MCP-verktygsfunktioner för SFSR ändringsregister
 
@@ -14,10 +18,10 @@ from sfsr_scraper import hamta_lag
 
 
 # ---------------------------------------------------------------------------
-# sfsr_get_law_history
+# sfsr_hamta_andringshistorik
 # ---------------------------------------------------------------------------
 
-def sfsr_get_law_history(sfs_nr: str) -> dict:
+def sfsr_hamta_andringshistorik(sfs_nr: str) -> dict:
     """
     Hämtar hela ändringshistoriken för en lag.
 
@@ -28,11 +32,21 @@ def sfsr_get_law_history(sfs_nr: str) -> dict:
         sfs_nr:               SFS-nummer för grundförfattningen, t.ex. "1993:1617"
     Returns:
         {
-          "sfs_nr":          str,
-          "rubrik":          str | None,
-          "ikraft_grundforfattning": str | None,   # ÅÅÅÅ-MM-DD
-          "celex_grundforfattning":  str | None,   # radbrytningsseparerade CELEX-nr
-          "antal_andringar": int,
+          "sfs_nr":                    str,
+          "rubrik":                    str | None,
+          "ikraft_grundforfattning":   str | None,   # ÅÅÅÅ-MM-DD
+          "utfardad_grundforfattning": str | None,   # ÅÅÅÅ-MM-DD
+          "upphavd_datum":             str | None,   # ÅÅÅÅ-MM-DD, None om ej upphävd
+          "upphavd_genom":             str | None,   # ersättande SFS-nummer
+          "departement":               str | None,
+          "t_o_m_sfs":                 str | None,   # vilken version som visas
+          "celex_grundforfattning":    list[str],    # CELEX-nr för grundförfattningen
+          "prop_grundforfattning":     str | None,   # proposition för grundförfattningen
+          "bet_grundforfattning":      str | None,   # betänkande för grundförfattningen
+          "rskr_grundforfattning":     str | None,   # riksdagsskrivelse för grundförfattningen
+          "cache_kalla":               str | None,   # "api" eller "html"
+          "cachad_vid":                str | None,   # ISO-tidpunkt för senaste cachning
+          "antal_andringar":           int,
           "andringar": [
             {
               "andrings_sfs":         str,
@@ -42,9 +56,10 @@ def sfsr_get_law_history(sfs_nr: str) -> dict:
               "prop":                 str | None,
               "bet":                  str | None,
               "rskr":                 str | None,
-              "celex":                str | None,
+              "celex":                list[str],
               "eu_direktiv":          bool,
               "overgangsbestammelse": bool,
+              "historisk":            bool,
             }, ...
           ]
         }
@@ -54,23 +69,74 @@ def sfsr_get_law_history(sfs_nr: str) -> dict:
     andringar = data.get("andringar", [])
 
     # Rensa interna fält som inte ska exponeras via MCP
+    # 'borttagen' är ett internt API-fält som inte är meningsfullt utåt.
+    # 'historisk' exponeras — det är relevant för att tolka datakvaliteten.
     andringar_ut = [
-        {k: v for k, v in a.items() if k not in ("historisk", "borttagen")}
+        {k: v for k, v in a.items() if k != "borttagen"}
         for a in andringar
     ]
 
     return {
-        "sfs_nr":          data["sfs_nr"],
-        "rubrik":          data.get("rubrik"),
-        "ikraft_grundforfattning": data.get("ikraft_grundforfattning"),
-        "celex_grundforfattning":  data.get("celex_grundforfattning"),
-        "antal_andringar": len(andringar_ut),
-        "andringar":       andringar_ut,
+        "sfs_nr":                    data["sfs_nr"],
+        "rubrik":                    data.get("rubrik"),
+        "ikraft_grundforfattning":   data.get("ikraft_grundforfattning"),
+        "utfardad_grundforfattning": data.get("utfardad_grundforfattning"),
+        "upphavd_datum":             data.get("upphavd_datum"),
+        "upphavd_genom":             data.get("upphavd_genom"),
+        "departement":               data.get("departement"),
+        "t_o_m_sfs":                 data.get("t_o_m_sfs"),
+        "celex_grundforfattning":    data.get("celex_grundforfattning") or [],
+        "prop_grundforfattning":     data.get("prop_grundforfattning"),
+        "bet_grundforfattning":      data.get("bet_grundforfattning"),
+        "rskr_grundforfattning":     data.get("rskr_grundforfattning"),
+        "cache_kalla":               data.get("cache_kalla"),
+        "cachad_vid":                data.get("cachad_vid"),
+        "antal_andringar":           len(andringar_ut),
+        "andringar":                 andringar_ut,
     }
 
 
 # ---------------------------------------------------------------------------
-# sfsr_get_paragraph_history
+# sfsr_hamta_lagtext
+# ---------------------------------------------------------------------------
+
+def sfsr_hamta_lagtext(sfs_nr: str) -> dict:
+    """
+    Hämtar den konsoliderade lagtexten för en grundförfattning.
+
+    Lagtexten är den version som visas på rkrattsbaser.gov.se, uppdaterad
+    t.o.m. det SFS-nummer som anges i t_o_m_sfs.
+
+    Om lagtexten saknas i cachen (t.ex. för äldre cachade rader) hämtas
+    posten om automatiskt från källan.
+
+    Args:
+        sfs_nr:   SFS-nummer för grundförfattningen, t.ex. "1993:1617"
+    Returns:
+        {
+          "sfs_nr":    str,
+          "rubrik":    str | None,
+          "t_o_m_sfs": str | None,   # "t.o.m. SFS ÅÅÅÅ:NNN"
+          "lagtext":   str | None,   # konsoliderad lagtext (kan vara None om
+                                     #  källan inte tillhandahåller fulltext)
+        }
+    """
+    data = hamta_lag(sfs_nr)
+
+    # Om lagtexten saknas i cachen (äldre post), tvinga en ny hämtning.
+    if data.get("lagtext") is None:
+        data = hamta_lag(sfs_nr, tvinga_uppdatering=True)
+
+    return {
+        "sfs_nr":    data["sfs_nr"],
+        "rubrik":    data.get("rubrik"),
+        "t_o_m_sfs": data.get("t_o_m_sfs"),
+        "lagtext":   data.get("lagtext"),
+    }
+
+
+# ---------------------------------------------------------------------------
+# sfsr_hamta_paragrafhistorik
 # ---------------------------------------------------------------------------
 
 # Ordinaltal (svenska) → arabiska siffror
@@ -215,7 +281,7 @@ def _beror_paragraf(paragrafer_text: str | None, paragraf: str) -> bool:
     return False
 
 
-def sfsr_get_paragraph_history(sfs_nr: str, paragraf: str) -> list[dict]:
+def sfsr_hamta_paragrafhistorik(sfs_nr: str, paragraf: str) -> list[dict]:
     """
     Filtrerar ändringshistoriken till de poster som berör en specifik paragraf.
 
@@ -224,9 +290,9 @@ def sfsr_get_paragraph_history(sfs_nr: str, paragraf: str) -> list[dict]:
         paragraf: Paragrafbeteckning, t.ex. "2 kap. 8 §" eller "3 §"
 
     Returns:
-        Lista av ändrings-SFS (samma fältuppsättning som i sfsr_get_law_history)
+        Lista av ändrings-SFS (samma fältuppsättning som i sfsr_hamta_andringshistorik)
         som berörs av den angivna paragrafen, i kronologisk ordning.
-        Tom lista om inga traffar.
+        Tom lista om inga träffar.
     """
     data = hamta_lag(sfs_nr)
     # Normalisera söktermen för att hantera naturliga uttryck
@@ -237,6 +303,6 @@ def sfsr_get_paragraph_history(sfs_nr: str, paragraf: str) -> list[dict]:
     ]
 
     return [
-        {k: v for k, v in a.items() if k not in ("historisk", "borttagen")}
+        {k: v for k, v in a.items() if k != "borttagen"}
         for a in andringar
     ]

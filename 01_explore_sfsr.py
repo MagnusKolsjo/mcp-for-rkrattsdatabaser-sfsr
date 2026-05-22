@@ -14,15 +14,6 @@ Testlagar:
 Körning:
   pip install requests beautifulsoup4
   python3 01_explore_sfsr.py
-
-Fynd från körning 2026-05-03:
-  - Strukturen är konsistent mellan lagar och storlekar.
-  - SFSR kräver ingen autentisering och inga speciella headers.
-  - Rubrik, Ikraft och Förarbeten kan saknas för gamla andringar (pre-1980).
-  - CELEX-nr kan innehålla flera nummer i ett fält (mellanslag-separerade).
-  - Grundförfattningen kan ha CELEX-nr (t.ex. Miljöbalken: 36 nummer).
-  - "overg.best." i Ikraft-fältet signalerar en övergångsbestämmelse.
-  - Ikraft-fält kan saknas helt för andringar av ikraftträdandebestämmelser.
 """
 
 import re
@@ -32,7 +23,7 @@ import requests
 from bs4 import BeautifulSoup
 
 SFSR_BASE_URL = "https://rkrattsbaser.gov.se/sfsr"
-USER_AGENT = "Mozilla/5.0 (compatible; riksdag-mcp-bot/1.0)"
+USER_AGENT = "mcp-for-rkrattsdatabaser-sfsr/1.0 (+https://github.com/MagnusKolsjo/mcp-for-rkrattsdatabaser-sfsr)"
 
 TESTLAGAR = [
     ("1993:1617", "Ordningslag — liten lag, ett CELEX-nr"),

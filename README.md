@@ -12,6 +12,8 @@ proposition.
 
 - **Hämtar hela ändringshistoriken** för en lag — alla ändrings-SFS med ikraftträdandedatum,
   berörda paragrafer och förarbeten (proposition, betänkande, riksdagsskrivelse)
+- **Hämtar konsoliderad lagtext** — den aktuella versionen av lagtexten, uppdaterad
+  t.o.m. senaste ändring
 - **Filtrerar på paragrafnivå** — visar bara de ändrings-SFS som berör en specifik paragraf,
   t.ex. "2 kap. 8 §"
 - **Följer ändringskedjan bakåt** — returnerar de senaste kedjeled i omvänd kronologisk
@@ -20,14 +22,14 @@ proposition.
   CELEX-nummer
 
 Data hämtas från beta.rkrattsbaser.gov.se (Elasticsearch-API, primärkälla) med
-automatisk fallback till HTML-skrapning av rkrattsbaser.gov.se om API:et inte svarar.
+automatisk övergång till HTML-skrapning av rkrattsbaser.gov.se om API:et inte svarar.
 Resultaten cachelagras lokalt för snabb återanvändning.
 
 ## Krav
 
 - Python 3.11 eller senare
 - Beroenden enligt `requirements.txt`
-- PostgreSQL (rekommenderas) eller SQLite (inget extra att installera)
+- PostgreSQL eller SQLite (ingen extra installation krävs för SQLite)
 - Ingen API-nyckel krävs — SFSR är öppet tillgängligt
 
 ## Installation
@@ -59,13 +61,13 @@ All konfiguration sker via `.env`-filen. Kopiera `config.example.env` till `.env
 | Variabel | Standardvärde | Beskrivning |
 |---|---|---|
 | `DATABASE_URL` | `sqlite:///sfsr_cache.db` | PostgreSQL- eller SQLite-anslutning |
-| `SFSR_BACKEND` | `api` | `api` (primär) eller `html` (fallback) |
+| `SFSR_BACKEND` | `api` | `api` eller `html` |
 | `SFSR_CACHE_TTL_HOURS` | `24` | Hur länge cachad data anses giltig (timmar) |
 | `SFSR_API_URL` | `https://beta.rkrattsbaser.gov.se/…` | URL till Elasticsearch-API:et |
-| `SFSR_BASE_URL` | `https://rkrattsbaser.gov.se/sfsr` | URL till HTML-sajten (fallback) |
+| `SFSR_BASE_URL` | `https://rkrattsbaser.gov.se/sfsr` | URL till HTML-sajten |
 | `MCP_TRANSPORT` | `stdio` | `stdio` (lokal) eller `http` (hostad) |
 
-**PostgreSQL** (rekommenderas — data isoleras i schemat `sfsr`):
+**PostgreSQL** (data isoleras i schemat `sfsr`):
 ```env
 DATABASE_URL=postgresql://anvandare:losenord@localhost:5432/riksdag
 ```
@@ -104,7 +106,7 @@ Nedan visas ett konfigurationsexempel för Claude Desktop (`claude_desktop_confi
 ```json
 {
   "mcpServers": {
-    "sfsr": {
+    "sfsr-v2": {
       "command": "python",
       "args": ["/absolut/stig/till/mcp_server.py"]
     }
@@ -118,39 +120,56 @@ Starta om MCP-klienten efter konfigurationsändringen.
 
 | Verktyg | Beskrivning |
 |---|---|
-| `sfsr_get_law_history` | Hämtar hela ändringshistoriken för en lag |
-| `sfsr_get_paragraph_history` | Filtrerar ändringar som berör en specifik paragraf |
-| `sfsr_trace_chain` | Följer ändringskedjan bakåt med propositionsreferenser |
+| `sfsr_hamta_andringshistorik` | Hämtar hela ändringshistoriken för en lag |
+| `sfsr_hamta_lagtext` | Hämtar konsoliderad lagtext för en grundförfattning |
+| `sfsr_hamta_paragrafhistorik` | Filtrerar ändringar som berör en specifik paragraf |
+| `sfsr_folj_andringskedja` | Följer ändringskedjan bakåt med propositionsreferenser |
 
-### sfsr_get_law_history
+### sfsr_hamta_andringshistorik
 
 ```
-sfsr_get_law_history(sfs_nr: str, inkludera_historiska: bool = False)
+sfsr_hamta_andringshistorik(sfs_nr: str)
 ```
 
 Hämtar alla ändrings-SFS för en lag, kronologiskt sorterade. Returnerar metadata
-om grundförfattningen (rubrik, ikraftträdandedatum, CELEX-nummer) samt för varje ändring:
-ändrings-SFS, ikraftträdandedatum, berörda paragrafer, proposition, betänkande,
-riksdagsskrivelse och CELEX-nummer.
+om grundförfattningen (rubrik, ikraftträdandedatum, utfärdandedatum, upphävningsdatum,
+departement, CELEX-nummer) samt för varje ändring: ändrings-SFS, ikraftträdandedatum,
+berörda paragrafer, proposition, betänkande, riksdagsskrivelse och CELEX-nummer.
 
-Exempel: `sfsr_get_law_history("1993:1617")` returnerar alla ändringar av ordningslagen.
+Fältet `historisk=true` markerar inaktuella poster enligt källan.
 
-### sfsr_get_paragraph_history
+Exempel: `sfsr_hamta_andringshistorik("1993:1617")` returnerar alla ändringar av ordningslagen.
+
+### sfsr_hamta_lagtext
 
 ```
-sfsr_get_paragraph_history(sfs_nr: str, paragraf: str)
+sfsr_hamta_lagtext(sfs_nr: str)
+```
+
+Hämtar den konsoliderade lagtexten för en grundförfattning — den version som visas
+på rkrattsbaser.gov.se, uppdaterad t.o.m. senaste ändring (`t_o_m_sfs`). Lagtexten
+kan vara `null` om källan inte tillhandahåller fulltext för den aktuella lagen.
+
+Exempel: `sfsr_hamta_lagtext("1993:1617")`
+
+### sfsr_hamta_paragrafhistorik
+
+```
+sfsr_hamta_paragrafhistorik(sfs_nr: str, paragraf: str)
 ```
 
 Filtrerar ändringshistoriken till poster som berör en specifik paragraf.
-Hämta först hela historiken med `sfsr_get_law_history` för att se hur paragraferna
-är betecknade i SFSR.
+Hämta först hela historiken med `sfsr_hamta_andringshistorik` för att se hur
+paragraferna är betecknade i SFSR.
 
-Exempel: `sfsr_get_paragraph_history("1993:1617", "2 kap. 8 §")`
+Accepterar naturliga uttryck: "2 kap. 8 §", "2:8", "andra kapitlet 8 §".
 
-### sfsr_trace_chain
+Exempel: `sfsr_hamta_paragrafhistorik("1993:1617", "2 kap. 8 §")`
+
+### sfsr_folj_andringskedja
 
 ```
-sfsr_trace_chain(sfs_nr: str, paragraf: str = None, djup: int = 5)
+sfsr_folj_andringskedja(sfs_nr: str, paragraf: str = None, djup: int = 5)
 ```
 
 Returnerar de senaste `djup` ändringarna i omvänd kronologisk ordning (nyast först).
@@ -164,7 +183,7 @@ register över ändringshistoriken för varje SFS-nummer. Data är offentlig
 information och kan fritt användas.
 
 Primärkälla: `beta.rkrattsbaser.gov.se` (Elasticsearch-API)
-Fallback: `rkrattsbaser.gov.se` (HTML-skrapning med BeautifulSoup4)
+Alternativ: `rkrattsbaser.gov.se` (HTML-skrapning med BeautifulSoup4)
 
 ## Utforskningsskript
 
@@ -181,13 +200,16 @@ python 02_explore_sfsr_api.py  # Utforskar och verifierar Elasticsearch-API:et
   proposition och betänkande, särskilt för ikraftträdandebestämmelser
 - **Ikraftträdandedatum kan saknas** för ändringar som enbart ändrar
   ikraftträdandebestämmelser för andra paragrafer
-- **HTML-fallbacken** kan behöva anpassas om rkrattsbaser.gov.se ändrar layout
+- **HTML-alternativet** kan behöva anpassas om rkrattsbaser.gov.se ändrar layout
 - **API-URL:en** innehåller `beta.` — om beta-sajten ersätter produktionssajten
   behöver `SFSR_API_URL` uppdateras i `.env` (troligen tas `beta.` bort)
 
 ## Licens
 
-[AGPLv3](LICENSE)
+[AGPL-3.0](LICENSE)
 
 SFSR-data är offentlig information från Regeringskansliet och kan fritt användas
 och distribueras.
+
+OBS: AGPL-3.0 kräver att källkod görs tillgänglig även när programvaran tillhandahålls
+som nätverkstjänst, inte bara vid distribution av binärer.

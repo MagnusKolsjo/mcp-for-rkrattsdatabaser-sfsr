@@ -1,6 +1,5 @@
 -- =============================================================================
--- Arbetsström 8 — SFSR ändringsregister
--- Databasschema: PostgreSQL
+-- SFSR MCP-server — databasschema: PostgreSQL
 -- Schema (namespace): sfsr
 -- =============================================================================
 
@@ -10,12 +9,21 @@ CREATE SCHEMA IF NOT EXISTS sfsr;
 -- sfsr_lagar: metadata för varje grundförfattning (ett SFS-nummer = en rad)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS sfsr.sfsr_lagar (
-    sfs_nr              TEXT        PRIMARY KEY,            -- t.ex. "1993:1617"
-    rubrik              TEXT,                               -- lagens officiella namn
-    ikraft_grundforfattning     DATE,                               -- ikraftträdandedatum för grundförfattningen
-    celex_grundforfattning      TEXT,                               -- radbrytningsseparerade CELEX-nr (kan vara tomt)
-    cachad_vid           TIMESTAMPTZ NOT NULL DEFAULT NOW(), -- tidpunkt för senaste hämtning
-    cache_kalla        TEXT        NOT NULL DEFAULT 'api'  -- 'api' eller 'html'
+    sfs_nr                      TEXT        PRIMARY KEY,            -- t.ex. "1993:1617"
+    rubrik                      TEXT,                               -- lagens officiella namn
+    ikraft_grundforfattning      DATE,                               -- ikraftträdandedatum
+    utfardad_grundforfattning    DATE,                               -- utfärdandedatum (kan skilja från ikraft)
+    upphavd_datum                DATE,                               -- datum då lagen upphävdes (NULL = gäller fortfarande)
+    upphavd_genom                TEXT,                               -- ersättande SFS-nummer (kan saknas)
+    departement                  TEXT,                               -- ansvarigt departement, t.ex. "Justitiedepartementet L4"
+    celex_grundforfattning       TEXT,                               -- kommaseparerade CELEX-nr (kan vara tomt)
+    t_o_m_sfs                    TEXT,                               -- "t.o.m. SFS ÅÅÅÅ:NNN" — vilken version som visas
+    lagtext                      TEXT,                               -- konsoliderad lagtext (kan vara stor)
+    prop_grundforfattning        TEXT,                               -- bakomliggande proposition för grundförfattningen
+    bet_grundforfattning         TEXT,                               -- bakomliggande betänkande för grundförfattningen
+    rskr_grundforfattning        TEXT,                               -- riksdagsskrivelse för grundförfattningen
+    cachad_vid                   TIMESTAMPTZ NOT NULL DEFAULT NOW(), -- tidpunkt för senaste hämtning
+    cache_kalla                  TEXT        NOT NULL DEFAULT 'api'  -- 'api' eller 'html'
 );
 
 -- ---------------------------------------------------------------------------
@@ -32,17 +40,17 @@ CREATE TABLE IF NOT EXISTS sfsr.sfsr_andringar (
     bet                     TEXT,                           -- bakomliggande betänkande
     rskr                    TEXT,                           -- riksdagsskrivelse
     celex                   TEXT,                           -- kommaseparerade CELEX-nr (kan vara tomt)
-    eu_direktiv             BOOLEAN     NOT NULL DEFAULT FALSE,   -- genomför EU-direktiv
+    eu_direktiv             BOOLEAN     NOT NULL DEFAULT FALSE,   -- genomför EU-direktiv (API:ets eUdirektiv-flagga)
     overgangsbestammelse    BOOLEAN     NOT NULL DEFAULT FALSE,   -- har övergångsbestämmelse
     historisk               BOOLEAN     NOT NULL DEFAULT FALSE,   -- historisk (inaktuell) post
     borttagen               BOOLEAN     NOT NULL DEFAULT FALSE    -- borttagen post
 );
 
-CREATE INDEX IF NOT EXISTS idx_sfsr_amendments_sfs_nr
+CREATE INDEX IF NOT EXISTS idx_sfsr_andringar_sfs_nr
     ON sfsr.sfsr_andringar (sfs_nr);
 
-CREATE INDEX IF NOT EXISTS idx_sfsr_amendments_andrings_sfs
+CREATE INDEX IF NOT EXISTS idx_sfsr_andringar_andrings_sfs
     ON sfsr.sfsr_andringar (andrings_sfs);
 
-CREATE INDEX IF NOT EXISTS idx_sfsr_amendments_ikrafttradande
+CREATE INDEX IF NOT EXISTS idx_sfsr_andringar_ikrafttradande
     ON sfsr.sfsr_andringar (ikrafttradande);

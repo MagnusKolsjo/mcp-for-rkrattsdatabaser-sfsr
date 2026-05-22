@@ -1,5 +1,9 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Magnus Kolsjö
+# Se LICENSE-filen i repots rot för fullständig licenstext.
+
 """
-db/init_db.py — Initierar databasen för arbetsström 8 (SFSR ändringsregister)
+db/init_db.py — Fristående skript för att initiera SFSR-databasen
 
 Läser DATABASE_URL från .env och skapar rätt tabeller beroende på databastyp:
   - postgresql://...  →  PostgreSQL med schema sfsr  (schema_postgres.sql)
@@ -13,9 +17,13 @@ Krav (PostgreSQL):
 
 Krav (SQLite):
     Inga extra beroenden — sqlite3 ingår i Python-standardbiblioteket.
+
+Servern initierar schemat automatiskt vid uppstart via db.py.
+Det här skriptet används för manuell initiering eller verifiering.
 """
 
 import os
+import re
 import sqlite3
 import sys
 from pathlib import Path
@@ -28,7 +36,7 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///sfsr_cache.db")
 SCHEMA_DIR = Path(__file__).parent
 
 
-def init_postgres(url: str) -> None:
+def initiera_postgres(url: str) -> None:
     """Initierar PostgreSQL-databas med sfsr-schema."""
     try:
         import psycopg2
@@ -47,7 +55,7 @@ def init_postgres(url: str) -> None:
     print("PostgreSQL-databas initierad (schema: sfsr).")
 
 
-def init_sqlite(url: str) -> None:
+def initiera_sqlite(url: str) -> None:
     """Initierar SQLite-databas."""
     db_path = url.replace("sqlite:///", "")
     schema = (SCHEMA_DIR / "schema_sqlite.sql").read_text(encoding="utf-8")
@@ -60,15 +68,20 @@ def init_sqlite(url: str) -> None:
     print(f"SQLite-databas initierad: {db_path}")
 
 
+def _maskera_url(url: str) -> str:
+    """Maskerar lösenordsdelen i en databas-URL för säker loggning/utskrift."""
+    return re.sub(r"://([^:]+):([^@]+)@", r"://\1:***@", url)
+
+
 def main() -> None:
-    print(f"DATABASE_URL: {DATABASE_URL}")
+    print(f"DATABASE_URL: {_maskera_url(DATABASE_URL)}")
 
     if DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgres://"):
-        init_postgres(DATABASE_URL)
+        initiera_postgres(DATABASE_URL)
     elif DATABASE_URL.startswith("sqlite:///"):
-        init_sqlite(DATABASE_URL)
+        initiera_sqlite(DATABASE_URL)
     else:
-        print(f"Fel: okänt URL-format: {DATABASE_URL}", file=sys.stderr)
+        print(f"Fel: okänt URL-format: {_maskera_url(DATABASE_URL)}", file=sys.stderr)
         print("Ange antingen postgresql://... eller sqlite:///...", file=sys.stderr)
         sys.exit(1)
 
