@@ -47,6 +47,12 @@ MCP_HOST      = os.getenv("MCP_HOST", "127.0.0.1")
 MCP_PORT      = int(os.getenv("MCP_PORT", "8000"))
 MCP_API_KEY   = os.getenv("MCP_API_KEY", "")
 
+# Standardtak för fulltext i hämtverktygen. Utan ett tak som gäller by default
+# kan ett anrop mot ett stort dokument överskrida MCP-protokollets storleksgräns
+# och misslyckas helt, utan väg runt. Anroparen kan alltid höja taket, eller
+# sätta 0 för hela texten som ett uttryckligt val.
+SFSR_MAX_TECKEN = int(os.getenv("SFSR_MAX_TECKEN", "60000"))
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s  %(levelname)-8s  %(message)s",
@@ -57,7 +63,61 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # MCP-server
 # ---------------------------------------------------------------------------
-mcp = FastMCP("sfsr-v2")
+mcp = FastMCP(
+    "sfsr-v2",
+    instructions=(
+        "MCP-server för Regeringskansliets rättsdatabaser (SFSR) — det strukturerade "
+        "ändringsregistret för svensk författningssamling. Verktygen har prefixet sfsr_. "
+        "Ger på paragrafnivå vilka ändrings-SFS som berört en bestämmelse, när de trädde "
+        "i kraft och vilka förarbeten som ligger bakom. "
+        "DISCOVERY: anta aldrig att ett SFS-nummer är gällande rätt utifrån förhandskunskap "
+        "— lagar upphävs och ersätts. Sök först fram aktuell lagstiftning på ämnestermer "
+        "(t.ex. med rd_search mot riksdagens öppna data) och bekräfta med "
+        "sfsr_hamta_andringshistorik innan paragrafhistorik hämtas. "
+        "SVARSSTORLEK: sfsr_hamta_lagtext tar max_tecken och fran_tecken. En "
+        "konsoliderad balk kan vara hundratusentals tecken och överskrida svarsgränsen "
+        "om hela texten begärs. Ett kapat svar bär trunkerad och fortsatt_fran_tecken. "
+        "CITAT: citera aldrig lagtext ur ett svar markerat som trunkerat — läs vidare "
+        "med fran_tecken tills hela bestämmelsen är hämtad."
+    ),
+)
+
+
+# ---------------------------------------------------------------------------
+# Textutdrag och trunkering
+# ---------------------------------------------------------------------------
+
+def _skar_ut(text, max_tecken: int, fran_tecken: int = 0) -> dict:
+    """
+    Skär ut ett textutdrag och redovisa alltid vad som kapats.
+
+    Trunkering utan markering är ett tyst datafel — svaret ser ut att vara hela
+    innehållet. max_tecken <= 0 betyder ingen trunkering. Klipper på ordgräns.
+    """
+    text   = text or ""
+    totalt = len(text)
+    start  = max(0, min(fran_tecken, totalt))
+    rest   = text[start:]
+
+    if max_tecken and max_tecken > 0 and len(rest) > max_tecken:
+        utdrag    = rest[:max_tecken]
+        brytpunkt = max(utdrag.rfind(" "), utdrag.rfind("\n"))
+        if brytpunkt > max_tecken * 0.6:
+            utdrag = utdrag[:brytpunkt]
+        utdrag    = utdrag.rstrip()
+        trunkerad = True
+    else:
+        utdrag    = rest
+        trunkerad = False
+
+    slut = start + len(utdrag)
+    return {
+        "text":                 utdrag,
+        "tecken_totalt":        totalt,
+        "tecken_visade":        len(utdrag),
+        "trunkerad":            trunkerad,
+        "fortsatt_fran_tecken": slut if slut < totalt else None,
+    }
 
 # Importera verktygsfunktionerna efter att servern skapats (de läser .env)
 from sfsr_tools import sfsr_hamta_andringshistorik as _hamta_andringshistorik
@@ -188,7 +248,11 @@ def sfsr_folj_andringskedja(
 
 
 @mcp.tool()
-def sfsr_hamta_lagtext(sfs_nr: str) -> str:
+def sfsr_hamta_lagtext(
+    sfs_nr: str,
+    max_tecken: int = SFSR_MAX_TECKEN,
+    fran_tecken: int = 0,
+) -> str:
     """
     Hämtar den konsoliderade lagtexten för en grundförfattning.
 
@@ -198,16 +262,41 @@ def sfsr_hamta_lagtext(sfs_nr: str) -> str:
     Om lagtexten saknas i cachen hämtas posten automatiskt om från källan.
 
     Parametrar:
-      sfs_nr  — SFS-nummer för grundförfattningen, t.ex. "1993:1617"
+      sfs_nr      — SFS-nummer för grundförfattningen, t.ex. "1993:1617"
+      max_tecken  — teckentak för lagtexten (0 = hela texten). En balk kan vara
+                    hundratusentals tecken och överskrida svarsgränsen; sätt ett
+                    tak och bläddra med fran_tecken när texten är stor.
+      fran_tecken — börja lagtexten vid denna teckenposition. Skicka värdet ur
+                    fortsatt_fran_tecken för att läsa vidare där förra anropet
+                    slutade.
 
     Returnerar JSON med fälten:
-      sfs_nr, rubrik, t_o_m_sfs, lagtext.
+      sfs_nr, rubrik, t_o_m_sfs, lagtext, samt — när lagtext finns —
+      tecken_totalt, tecken_visade, trunkerad och fortsatt_fran_tecken.
 
     Fältet lagtext kan vara null om källan inte tillhandahåller fulltext
     för den aktuella grundförfattningen.
+
+    Citera aldrig ur ett svar där trunkerad är true — läs vidare först.
     """
     try:
         resultat = _hamta_lagtext(sfs_nr)
+
+        lagtext = resultat.get("lagtext") if isinstance(resultat, dict) else None
+        if lagtext:
+            utdrag = _skar_ut(lagtext, max_tecken, fran_tecken)
+            resultat["lagtext"]              = utdrag["text"]
+            resultat["tecken_totalt"]        = utdrag["tecken_totalt"]
+            resultat["tecken_visade"]        = utdrag["tecken_visade"]
+            resultat["trunkerad"]            = utdrag["trunkerad"]
+            resultat["fortsatt_fran_tecken"] = utdrag["fortsatt_fran_tecken"]
+            if utdrag["trunkerad"]:
+                resultat["las_vidare"] = (
+                    f"Lagtexten är kapad. Läs vidare med "
+                    f"sfsr_hamta_lagtext('{sfs_nr}', "
+                    f"fran_tecken={utdrag['fortsatt_fran_tecken']})."
+                )
+
         return json.dumps(resultat, ensure_ascii=False, indent=2)
     except Exception as e:
         log.exception("Fel i sfsr_hamta_lagtext för %s", sfs_nr)

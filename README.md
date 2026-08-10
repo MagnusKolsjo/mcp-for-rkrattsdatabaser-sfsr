@@ -143,7 +143,7 @@ Exempel: `sfsr_hamta_andringshistorik("1993:1617")` returnerar alla ändringar a
 ### sfsr_hamta_lagtext
 
 ```
-sfsr_hamta_lagtext(sfs_nr: str)
+sfsr_hamta_lagtext(sfs_nr: str, max_tecken: int = 0, fran_tecken: int = 0)
 ```
 
 Hämtar den konsoliderade lagtexten för en grundförfattning — den version som visas
@@ -151,6 +151,20 @@ på rkrattsbaser.gov.se, uppdaterad t.o.m. senaste ändring (`t_o_m_sfs`). Lagte
 kan vara `null` om källan inte tillhandahåller fulltext för den aktuella lagen.
 
 Exempel: `sfsr_hamta_lagtext("1993:1617")`
+
+**Stora författningar.** Konsoliderade balkar är omfattande — brottsbalken är
+drygt 356 000 tecken — och kan närma sig eller överskrida MCP-protokollets
+storleksgräns per svar. Sätt `max_tecken` och bläddra med `fran_tecken`:
+
+```
+sfsr_hamta_lagtext("1962:700", max_tecken=20000)
+→ trunkerad: true, fortsatt_fran_tecken: 19994
+sfsr_hamta_lagtext("1962:700", max_tecken=20000, fran_tecken=19994)
+```
+
+Ett kapat svar bär alltid `trunkerad`, `tecken_totalt`, `tecken_visade` och
+`fortsatt_fran_tecken`. Kapningen sker på ordgräns. Citera aldrig lagtext ur ett
+svar där `trunkerad` är `true` — läs vidare först.
 
 ### sfsr_hamta_paragrafhistorik
 

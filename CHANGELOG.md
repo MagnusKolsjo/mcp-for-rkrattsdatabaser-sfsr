@@ -4,7 +4,26 @@ Alla meningsfulla ändringar dokumenteras här.
 Formatet följer [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versionshanteringen följer [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [4.1.0] — 2026-08-10
+
+### Tillagt
+
+- **`max_tecken` och `fran_tecken` i `sfsr_hamta_lagtext`.** Verktyget returnerade
+  hela den konsoliderade lagtexten utan möjlighet att begränsa. Brottsbalken är
+  356 524 tecken; en omfattande balk kan därmed närma sig eller överskrida
+  MCP-protokollets storleksgräns per svar, utan att anroparen har någon väg runt.
+  Kapade svar bär `trunkerad`, `tecken_totalt`, `tecken_visade`,
+  `fortsatt_fran_tecken` och `las_vidare` med det färdiga fortsättningsanropet.
+  Kapningen sker på ordgräns.
+- **`instructions`-sträng på servern** — discovery-protokollet (anta aldrig att ett
+  SFS-nummer är gällande rätt utan verifiering), storleksregeln och citatregeln.
+  Servern saknade tidigare en beskrivning på servernivå.
+
+### Bakgrund
+
+Genomför projektets svarskontrakt (`00-las-forst.md` → "Svarskontraktet — storlek,
+trunkering, adressering och sökning"). Additiva parametrar och fält — inga brytande
+ändringar, inga schemaändringar.
 
 ## [4.0.0] — 2026-05-22
 
