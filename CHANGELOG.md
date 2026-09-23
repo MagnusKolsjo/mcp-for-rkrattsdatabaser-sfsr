@@ -15,15 +15,19 @@ Versionshanteringen följer [Semantic Versioning](https://semver.org/).
 - **Verktygens returvärden är typade** (`TypedDict`) i stället för
   JSON-strängar (`-> str` + `json.dumps`). Klienter som läser
   `structuredContent` får nu ett fullständigt utdataschema per verktyg;
-  klienter som bara läser textinnehållet ser samma JSON som förut.
+  klienter som bara läser textinnehållet ser i praktiken samma JSON som
+  förut — utom för ett tomt listsvar (`sfsr_hamta_paragrafhistorik` utan
+  träffar), där textinnehållet nu är tomt i stället för `"[]"` och det
+  faktiska svaret bara finns i `structuredContent` (`{"result": []}`).
   Fält som kan saknas i källdata är typade som `X | None`, inte
   obligatoriska — historisk SFSR-data har gott om null-fält.
 - **Förväntade fel kastas nu som `ToolError`** i stället för att paketeras
   som `{"fel": "..."}` i ett annars lyckat textsvar — t.ex. när ett
-  SFS-nummer inte finns i API:et. Svaret får `isError: true` med ett
-  begripligt meddelande. Oväntade fel (t.ex. ett trasigt källsvar) ger
-  fortsatt ett generiskt felmeddelande utan detaljer i protokollet; spåret
-  loggas som förut.
+  SFS-nummer inte finns i API:et, källan inte svarar, eller databasen är
+  otillgänglig. Svaret får `isError: true` med ett begripligt meddelande;
+  den tekniska detaljen för käll- och databasfel loggas separat. Bara
+  genuint oväntade fel (programmeringsfel) ger MCP:s generiska felsvar
+  utan detaljer i protokollet; spåret loggas som förut.
 - Alla fyra verktyg har fått `title` och `annotations`
   (`readOnlyHint`/`destructiveHint`/`idempotentHint`/`openWorldHint`) —
   samtliga är läsningar mot en extern källa (`LASNING_EXTERN`), inklusive
@@ -59,9 +63,9 @@ Versionshanteringen följer [Semantic Versioning](https://semver.org/).
   utfärdad 1962-12-21) och SFS 1980:11 (utfärdad 1980-01-10): båda saknades
   helt trots att API-svaret innehåller värdet.
 
-  Audit 2026-05-22 (Bg6, rad 285) beskrev null för 1980:11 som ett
-  innehållsgap hos källan. Det var fel — orsaken var fältläsning på fel
-  nivå i klientkoden, inte en lucka i SFSR:s data.
+  En tidigare granskning beskrev null för 1980:11 som ett innehållsgap hos
+  källan. Det var fel — orsaken var fältläsning på fel nivå i klientkoden,
+  inte en lucka i SFSR:s data.
 
   Övriga toppnivåfält (`ikraftDateTime`, `upphavdDateTime`) ligger korrekt
   på toppnivån i svaret och är opåverkade. Genomgången av samtliga använda
