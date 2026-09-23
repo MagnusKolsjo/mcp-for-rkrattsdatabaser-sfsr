@@ -6,7 +6,7 @@ python-dotenv>=1.0
 beautifulsoup4>=4.12
 
 # MCP-protokoll
-mcp>=1.0
+mcp>=2.0,<3
 
 # PostgreSQL (frivilligt — krävs om DATABASE_URL=postgresql://...)
 psycopg2-binary>=2.9

@@ -15,43 +15,45 @@ Krav:
   - Konfiguration via .env (se config.example.env)
   - Installerade beroenden: pip install -r requirements.txt
 
-Transport-lägen (styrs via MCP_TRANSPORT i .env):
-
-  stdio (standard, lokal användning):
-    python3 mcp_server.py
-    MCP-klienten startar och hanterar processen direkt.
-
-  http (hostad driftsättning):
-    MCP_TRANSPORT=http python3 mcp_server.py
-    Servern lyssnar på MCP_HOST:MCP_PORT (standard 127.0.0.1:8000).
-    Sätt MCP_API_KEY till ett slumpmässigt genererat token:
-      python3 -c "import secrets; print(secrets.token_hex(32))"
-    I produktion: lägg en reverse proxy (t.ex. Nginx) framför servern.
+Transport styrs via MCP_TRANSPORT i .env: stdio (standard, lokal användning)
+eller http (hostad driftsättning, kräver MCP_API_KEY). Se mcp_transport.py.
 """
 
-import json
+from __future__ import annotations
+
 import logging
 import os
-from typing import Optional
+from pathlib import Path
+from typing import Annotated, Literal, NotRequired, Optional, TypedDict
 
 from dotenv import load_dotenv
-from mcp.server.fastmcp import FastMCP
 
-load_dotenv()
+_SCRIPT_DIR = Path(__file__).parent.resolve()
+load_dotenv(_SCRIPT_DIR / ".env")
+
+from mcp.server.mcpserver import MCPServer  # noqa: E402
+from mcp.server.mcpserver.exceptions import ToolError  # noqa: E402
+from pydantic import Field  # noqa: E402
+
+from db import initiera_schema  # noqa: E402
+from mcp_annotationer import CACHE_HINTAR, LASNING_EXTERN  # noqa: E402
+from mcp_transport import starta  # noqa: E402
+from sfsr_tools import sfsr_hamta_andringshistorik as _hamta_andringshistorik  # noqa: E402
+from sfsr_tools import sfsr_hamta_lagtext as _hamta_lagtext  # noqa: E402
+from sfsr_tools import sfsr_hamta_paragrafhistorik as _hamta_paragrafhistorik  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Konfiguration
 # ---------------------------------------------------------------------------
-MCP_TRANSPORT = os.getenv("MCP_TRANSPORT", "stdio").lower()
-MCP_HOST      = os.getenv("MCP_HOST", "127.0.0.1")
-MCP_PORT      = int(os.getenv("MCP_PORT", "8000"))
-MCP_API_KEY   = os.getenv("MCP_API_KEY", "")
 
 # Standardtak för fulltext i hämtverktygen. Utan ett tak som gäller by default
 # kan ett anrop mot ett stort dokument överskrida MCP-protokollets storleksgräns
 # och misslyckas helt, utan väg runt. Anroparen kan alltid höja taket, eller
 # sätta 0 för hela texten som ett uttryckligt val.
 SFSR_MAX_TECKEN = int(os.getenv("SFSR_MAX_TECKEN", "60000"))
+
+# Versionen följer senaste släppta version i CHANGELOG.md.
+SERVERVERSION = "4.1.0"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -60,26 +62,76 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
+
 # ---------------------------------------------------------------------------
-# MCP-server
+# Svarstyper
+#
+# SFSR:s API lämnar många fält null (särskilt för äldre författningar och
+# ändringar som bara rör ikraftträdandebestämmelser), så nästan alla fält
+# utom sfs_nr/andrings_sfs är valfria. Ett fält som typen kräver men som
+# saknas i svaret får hela anropet att misslyckas.
 # ---------------------------------------------------------------------------
-mcp = FastMCP(
-    "sfsr-v2",
-    instructions=(
-        "MCP-server för Regeringskansliets rättsdatabaser (SFSR) — det strukturerade "
-        "ändringsregistret för svensk författningssamling. Verktygen har prefixet sfsr_. "
-        "Ger på paragrafnivå vilka ändrings-SFS som berört en bestämmelse, när de trädde "
-        "i kraft och vilka förarbeten som ligger bakom. "
-        "DISCOVERY: anta aldrig att ett SFS-nummer är gällande rätt utifrån förhandskunskap "
-        "— lagar upphävs och ersätts. Sök först fram aktuell lagstiftning på ämnestermer "
-        "(t.ex. med rd_search mot riksdagens öppna data) och bekräfta med "
-        "sfsr_hamta_andringshistorik innan paragrafhistorik hämtas. "
-        "SVARSSTORLEK: sfsr_hamta_lagtext tar max_tecken och fran_tecken. En "
-        "konsoliderad balk kan vara hundratusentals tecken och överskrida svarsgränsen "
-        "om hela texten begärs. Ett kapat svar bär trunkerad och fortsatt_fran_tecken. "
-        "CITAT: citera aldrig lagtext ur ett svar markerat som trunkerat — läs vidare "
-        "med fran_tecken tills hela bestämmelsen är hämtad."
-    ),
+
+class Andring(TypedDict):
+    """En ändrings-SFS i en grundförfattnings ändringshistorik."""
+    andrings_sfs:         str | None
+    rubrik:                str | None
+    ikrafttradande:        str | None   # ÅÅÅÅ-MM-DD
+    paragrafer:             str | None
+    prop:                   str | None
+    bet:                    str | None
+    rskr:                   str | None
+    celex:                  list[str]
+    eu_direktiv:            bool
+    overgangsbestammelse:   bool
+    historisk:              bool
+
+
+class Andringshistorik(TypedDict):
+    """Svar från sfsr_hamta_andringshistorik."""
+    sfs_nr:                       str
+    rubrik:                       str | None
+    ikraft_grundforfattning:      str | None   # ÅÅÅÅ-MM-DD
+    utfardad_grundforfattning:    str | None   # ÅÅÅÅ-MM-DD
+    upphavd_datum:                str | None   # ÅÅÅÅ-MM-DD, None om ej upphävd
+    upphavd_genom:                str | None   # ersättande SFS-nummer
+    departement:                  str | None
+    t_o_m_sfs:                    str | None
+    celex_grundforfattning:       list[str]
+    prop_grundforfattning:        str | None
+    bet_grundforfattning:         str | None
+    rskr_grundforfattning:        str | None
+    cache_kalla:                  str | None   # "api" eller "html"
+    cachad_vid:                   str | None   # ISO-tidpunkt för senaste cachning
+    antal_andringar:              int
+    andringar:                    list[Andring]
+
+
+class Lagtext(TypedDict):
+    """Svar från sfsr_hamta_lagtext."""
+    sfs_nr:                str
+    rubrik:                 str | None
+    t_o_m_sfs:               str | None
+    lagtext:                 str | None
+    tecken_totalt:           NotRequired[int]
+    tecken_visade:           NotRequired[int]
+    trunkerad:                NotRequired[bool]
+    fortsatt_fran_tecken:     NotRequired[int | None]
+    las_vidare:               NotRequired[str]
+
+
+# Fältet heter "not" i den befintliga returstrukturen — reserverat ord i
+# Python, så TypedDict byggs med den funktionella syntaxen i stället för
+# class-satsen som övriga typer.
+Andringskedja = TypedDict(
+    "Andringskedja",
+    {
+        "sfs_nr":   str,
+        "paragraf": str | None,
+        "djup":     int,
+        "kedjeled": list[Andring],
+        "not":      str,
+    },
 )
 
 
@@ -87,7 +139,7 @@ mcp = FastMCP(
 # Textutdrag och trunkering
 # ---------------------------------------------------------------------------
 
-def _skar_ut(text, max_tecken: int, fran_tecken: int = 0) -> dict:
+def _skar_ut(text: str | None, max_tecken: int, fran_tecken: int = 0) -> dict:
     """
     Skär ut ett textutdrag och redovisa alltid vad som kapats.
 
@@ -119,14 +171,54 @@ def _skar_ut(text, max_tecken: int, fran_tecken: int = 0) -> dict:
         "fortsatt_fran_tecken": slut if slut < totalt else None,
     }
 
-# Importera verktygsfunktionerna efter att servern skapats (de läser .env)
-from sfsr_tools import sfsr_hamta_andringshistorik as _hamta_andringshistorik
-from sfsr_tools import sfsr_hamta_paragrafhistorik as _hamta_paragrafhistorik
-from sfsr_tools import sfsr_hamta_lagtext as _hamta_lagtext
+
+def _andring(a: dict) -> Andring:
+    """Plockar ut de fält en Andring lovar, ur sfsr_tools svar (som även bär `borttagen`)."""
+    return {
+        "andrings_sfs":         a.get("andrings_sfs"),
+        "rubrik":                a.get("rubrik"),
+        "ikrafttradande":        a.get("ikrafttradande"),
+        "paragrafer":            a.get("paragrafer"),
+        "prop":                  a.get("prop"),
+        "bet":                   a.get("bet"),
+        "rskr":                  a.get("rskr"),
+        "celex":                 a.get("celex") or [],
+        "eu_direktiv":           bool(a.get("eu_direktiv")),
+        "overgangsbestammelse":  bool(a.get("overgangsbestammelse")),
+        "historisk":             bool(a.get("historisk")),
+    }
 
 
-@mcp.tool()
-def sfsr_hamta_andringshistorik(sfs_nr: str) -> str:
+# ---------------------------------------------------------------------------
+# MCP-server
+# ---------------------------------------------------------------------------
+
+mcp = MCPServer(
+    "sfsr-v2",
+    instructions=(
+        "MCP-server för Regeringskansliets rättsdatabaser (SFSR) — det strukturerade "
+        "ändringsregistret för svensk författningssamling. Verktygen har prefixet sfsr_. "
+        "Ger på paragrafnivå vilka ändrings-SFS som berört en bestämmelse, när de trädde "
+        "i kraft och vilka förarbeten som ligger bakom. "
+        "DISCOVERY: anta aldrig att ett SFS-nummer är gällande rätt utifrån förhandskunskap "
+        "— lagar upphävs och ersätts. Sök först fram aktuell lagstiftning på ämnestermer "
+        "(t.ex. med rd_search mot riksdagens öppna data) och bekräfta med "
+        "sfsr_hamta_andringshistorik innan paragrafhistorik hämtas. "
+        "SVARSSTORLEK: sfsr_hamta_lagtext tar max_tecken och fran_tecken. En "
+        "konsoliderad balk kan vara hundratusentals tecken och överskrida svarsgränsen "
+        "om hela texten begärs. Ett kapat svar bär trunkerad och fortsatt_fran_tecken. "
+        "CITAT: citera aldrig lagtext ur ett svar markerat som trunkerat — läs vidare "
+        "med fran_tecken tills hela bestämmelsen är hämtad."
+    ),
+    version=SERVERVERSION,
+    cache_hints=CACHE_HINTAR,
+)
+
+
+@mcp.tool(title="Hämta ändringshistorik", annotations=LASNING_EXTERN)
+def sfsr_hamta_andringshistorik(
+    sfs_nr: Annotated[str, Field(description="SFS-nummer för grundförfattningen, t.ex. \"1993:1617\"")],
+) -> Andringshistorik:
     """
     Hämtar hela ändringshistoriken för en lag från SFSR.
 
@@ -134,52 +226,46 @@ def sfsr_hamta_andringshistorik(sfs_nr: str) -> str:
     ändrings-SFS, med ikraftträdandedatum, berörda paragrafer och förarbeten
     (proposition, betänkande, riksdagsskrivelse).
 
-    Parametrar:
-      sfs_nr  — SFS-nummer för grundförfattningen, t.ex. "1993:1617"
-
-    Returnerar JSON med fälten:
-      sfs_nr, rubrik, ikraft_grundforfattning, utfardad_grundforfattning,
-      upphavd_datum, upphavd_genom, departement, t_o_m_sfs,
-      celex_grundforfattning (lista),
-      prop_grundforfattning, bet_grundforfattning, rskr_grundforfattning,
-      cache_kalla, cachad_vid, antal_andringar, andringar (lista).
-
-    Varje andring innehåller: andrings_sfs, rubrik, ikrafttradande,
-    paragrafer, prop, bet, rskr, celex (lista), eu_direktiv,
-    overgangsbestammelse, historisk.
-
     Fältet historisk=true markerar poster som är inaktuella enligt källan
-    (t.ex. ersatta av en ny version av samma andring).
+    (t.ex. ersatta av en ny version av samma ändring).
     """
     try:
         resultat = _hamta_andringshistorik(sfs_nr)
-        return json.dumps(resultat, ensure_ascii=False, indent=2)
-    except Exception as e:
-        log.exception("Fel i sfsr_hamta_andringshistorik för %s", sfs_nr)
-        return json.dumps({"fel": str(e)}, ensure_ascii=False)
+    except ValueError as e:
+        raise ToolError(str(e)) from e
+
+    return {
+        "sfs_nr":                    resultat["sfs_nr"],
+        "rubrik":                    resultat.get("rubrik"),
+        "ikraft_grundforfattning":   resultat.get("ikraft_grundforfattning"),
+        "utfardad_grundforfattning": resultat.get("utfardad_grundforfattning"),
+        "upphavd_datum":             resultat.get("upphavd_datum"),
+        "upphavd_genom":             resultat.get("upphavd_genom"),
+        "departement":               resultat.get("departement"),
+        "t_o_m_sfs":                 resultat.get("t_o_m_sfs"),
+        "celex_grundforfattning":    resultat.get("celex_grundforfattning") or [],
+        "prop_grundforfattning":     resultat.get("prop_grundforfattning"),
+        "bet_grundforfattning":      resultat.get("bet_grundforfattning"),
+        "rskr_grundforfattning":     resultat.get("rskr_grundforfattning"),
+        "cache_kalla":               resultat.get("cache_kalla"),
+        "cachad_vid":                resultat.get("cachad_vid"),
+        "antal_andringar":           resultat.get("antal_andringar", 0),
+        "andringar":                 [_andring(a) for a in resultat.get("andringar", [])],
+    }
 
 
-@mcp.tool()
+@mcp.tool(title="Hämta paragrafhistorik", annotations=LASNING_EXTERN)
 def sfsr_hamta_paragrafhistorik(
-    sfs_nr: str,
-    paragraf: str,
-) -> str:
+    sfs_nr: Annotated[str, Field(description="SFS-nummer för grundförfattningen, t.ex. \"1993:1617\"")],
+    paragraf: Annotated[str, Field(description="Paragrafbeteckning, t.ex. \"2 kap. 8 §\" eller \"3 §\"")],
+) -> list[Andring]:
     """
     Filtrerar ändringshistoriken till poster som berör en specifik paragraf.
 
     Använd detta för att spåra hur en enskild paragraf förändrats över tid —
     t.ex. vilka propositioner som lett till att paragrafen ändrats och när.
 
-    Parametrar:
-      sfs_nr   — SFS-nummer för grundförfattningen, t.ex. "1993:1617"
-      paragraf — paragrafbeteckning, t.ex. "2 kap. 8 §" eller "3 §"
-
     Accepterar naturliga uttryck: "2:8", "andra kapitlet 8 §", "para 8 kap 2".
-
-    Returnerar JSON-lista av ändrings-SFS i kronologisk ordning.
-    Varje post innehåller: andrings_sfs, rubrik, ikrafttradande,
-    paragrafer, prop, bet, rskr, celex (lista), eu_direktiv,
-    overgangsbestammelse, historisk.
     Tom lista om inga träffar.
 
     Tips: hämta först hela historiken med sfsr_hamta_andringshistorik för att
@@ -187,18 +273,21 @@ def sfsr_hamta_paragrafhistorik(
     """
     try:
         resultat = _hamta_paragrafhistorik(sfs_nr, paragraf)
-        return json.dumps(resultat, ensure_ascii=False, indent=2)
-    except Exception as e:
-        log.exception("Fel i sfsr_hamta_paragrafhistorik för %s §%s", sfs_nr, paragraf)
-        return json.dumps({"fel": str(e)}, ensure_ascii=False)
+    except ValueError as e:
+        raise ToolError(str(e)) from e
+
+    return [_andring(a) for a in resultat]
 
 
-@mcp.tool()
+@mcp.tool(title="Följ ändringskedja", annotations=LASNING_EXTERN)
 def sfsr_folj_andringskedja(
-    sfs_nr: str,
-    paragraf: Optional[str] = None,
-    djup: int = 5,
-) -> str:
+    sfs_nr: Annotated[str, Field(description="SFS-nummer för grundförfattningen, t.ex. \"1993:1617\"")],
+    paragraf: Annotated[
+        Optional[str],
+        Field(description="Om angiven filtreras kedjan till ändringar som rör just den paragrafen, t.ex. \"2 kap. 8 §\""),
+    ] = None,
+    djup: Annotated[int, Field(description="Max antal kedjeled att följa (standard: 5, max: 20)")] = 5,
+) -> Andringskedja:
     """
     Följer ändringskedjan bakåt för en lag (eller paragraf) och returnerar
     en ordnad lista av kedjeled med källa, datum och propositionsreferens.
@@ -206,19 +295,6 @@ def sfsr_folj_andringskedja(
     Varje kedjeled representerar ett ändrings-SFS med tillhörande förarbeten.
     Kombinera med riksdagens API-server för att hämta propositionstexter och
     få fullständig spårbarhet från gällande rätt tillbaka till ursprungsproposition.
-
-    Parametrar:
-      sfs_nr   — SFS-nummer för grundförfattningen, t.ex. "1993:1617"
-      paragraf — om angiven filtreras kedjan till ändringar som rör just
-                 den paragrafen, t.ex. "2 kap. 8 §"
-      djup     — max antal kedjeled att följa (standard: 5, max: 20)
-
-    Returnerar JSON-lista av kedjeled i omvänd kronologisk ordning (nyast först).
-    Varje led innehåller: andrings_sfs, rubrik, ikrafttradande, paragrafer,
-    prop, bet, rskr, celex (lista), eu_direktiv, overgangsbestammelse, historisk.
-
-    OBS: Nuvarande version returnerar SFSR-data med propositionsreferenser.
-    Slå upp propositionerna med rd_get_document från riksdagens API-server.
     """
     djup = min(max(1, djup), 20)
     try:
@@ -227,32 +303,36 @@ def sfsr_folj_andringskedja(
         else:
             lag = _hamta_andringshistorik(sfs_nr)
             andringar = lag["andringar"]
+    except ValueError as e:
+        raise ToolError(str(e)) from e
 
-        # Returnera de senaste `djup` ändringarna i omvänd ordning (nyast först)
-        kedjeled = list(reversed(andringar[-djup:]))
+    # Returnera de senaste `djup` ändringarna i omvänd ordning (nyast först)
+    kedjeled = list(reversed(andringar[-djup:]))
 
-        resultat = {
-            "sfs_nr":   sfs_nr,
-            "paragraf": paragraf,
-            "djup":     djup,
-            "kedjeled": kedjeled,
-            "not":      (
-                "Propositionstexter hämtas via rd_get_document i riksdagens API-server. "
-                "Ange prop-värdet som dok_id."
-            ),
-        }
-        return json.dumps(resultat, ensure_ascii=False, indent=2)
-    except Exception as e:
-        log.exception("Fel i sfsr_folj_andringskedja för %s", sfs_nr)
-        return json.dumps({"fel": str(e)}, ensure_ascii=False)
+    return {
+        "sfs_nr":   sfs_nr,
+        "paragraf": paragraf,
+        "djup":     djup,
+        "kedjeled": [_andring(a) for a in kedjeled],
+        "not":      (
+            "Propositionstexter hämtas via rd_get_document i riksdagens API-server. "
+            "Ange prop-värdet som dok_id."
+        ),
+    }
 
 
-@mcp.tool()
+@mcp.tool(title="Hämta konsoliderad lagtext", annotations=LASNING_EXTERN)
 def sfsr_hamta_lagtext(
-    sfs_nr: str,
-    max_tecken: int = SFSR_MAX_TECKEN,
-    fran_tecken: int = 0,
-) -> str:
+    sfs_nr: Annotated[str, Field(description="SFS-nummer för grundförfattningen, t.ex. \"1993:1617\"")],
+    max_tecken: Annotated[
+        int,
+        Field(description="Teckentak för lagtexten (0 = hela texten). Bläddra med fran_tecken när texten är stor."),
+    ] = SFSR_MAX_TECKEN,
+    fran_tecken: Annotated[
+        int,
+        Field(description="Börja lagtexten vid denna teckenposition — värdet ur fortsatt_fran_tecken från förra anropet."),
+    ] = 0,
+) -> Lagtext:
     """
     Hämtar den konsoliderade lagtexten för en grundförfattning.
 
@@ -260,20 +340,6 @@ def sfsr_hamta_lagtext(
     t.o.m. det SFS-nummer som anges i t_o_m_sfs.
 
     Om lagtexten saknas i cachen hämtas posten automatiskt om från källan.
-
-    Parametrar:
-      sfs_nr      — SFS-nummer för grundförfattningen, t.ex. "1993:1617"
-      max_tecken  — teckentak för lagtexten (0 = hela texten). En balk kan vara
-                    hundratusentals tecken och överskrida svarsgränsen; sätt ett
-                    tak och bläddra med fran_tecken när texten är stor.
-      fran_tecken — börja lagtexten vid denna teckenposition. Skicka värdet ur
-                    fortsatt_fran_tecken för att läsa vidare där förra anropet
-                    slutade.
-
-    Returnerar JSON med fälten:
-      sfs_nr, rubrik, t_o_m_sfs, lagtext, samt — när lagtext finns —
-      tecken_totalt, tecken_visade, trunkerad och fortsatt_fran_tecken.
-
     Fältet lagtext kan vara null om källan inte tillhandahåller fulltext
     för den aktuella grundförfattningen.
 
@@ -281,67 +347,37 @@ def sfsr_hamta_lagtext(
     """
     try:
         resultat = _hamta_lagtext(sfs_nr)
+    except ValueError as e:
+        raise ToolError(str(e)) from e
 
-        lagtext = resultat.get("lagtext") if isinstance(resultat, dict) else None
-        if lagtext:
-            utdrag = _skar_ut(lagtext, max_tecken, fran_tecken)
-            resultat["lagtext"]              = utdrag["text"]
-            resultat["tecken_totalt"]        = utdrag["tecken_totalt"]
-            resultat["tecken_visade"]        = utdrag["tecken_visade"]
-            resultat["trunkerad"]            = utdrag["trunkerad"]
-            resultat["fortsatt_fran_tecken"] = utdrag["fortsatt_fran_tecken"]
-            if utdrag["trunkerad"]:
-                resultat["las_vidare"] = (
-                    f"Lagtexten är kapad. Läs vidare med "
-                    f"sfsr_hamta_lagtext('{sfs_nr}', "
-                    f"fran_tecken={utdrag['fortsatt_fran_tecken']})."
-                )
+    svar: Lagtext = {
+        "sfs_nr":    resultat["sfs_nr"],
+        "rubrik":    resultat.get("rubrik"),
+        "t_o_m_sfs": resultat.get("t_o_m_sfs"),
+        "lagtext":   resultat.get("lagtext"),
+    }
 
-        return json.dumps(resultat, ensure_ascii=False, indent=2)
-    except Exception as e:
-        log.exception("Fel i sfsr_hamta_lagtext för %s", sfs_nr)
-        return json.dumps({"fel": str(e)}, ensure_ascii=False)
+    lagtext = resultat.get("lagtext")
+    if lagtext:
+        utdrag = _skar_ut(lagtext, max_tecken, fran_tecken)
+        svar["lagtext"]              = utdrag["text"]
+        svar["tecken_totalt"]        = utdrag["tecken_totalt"]
+        svar["tecken_visade"]        = utdrag["tecken_visade"]
+        svar["trunkerad"]            = utdrag["trunkerad"]
+        svar["fortsatt_fran_tecken"] = utdrag["fortsatt_fran_tecken"]
+        if utdrag["trunkerad"]:
+            svar["las_vidare"] = (
+                f"Lagtexten är kapad. Läs vidare med "
+                f"sfsr_hamta_lagtext('{sfs_nr}', "
+                f"fran_tecken={utdrag['fortsatt_fran_tecken']})."
+            )
+
+    return svar
 
 
 # ---------------------------------------------------------------------------
 # Startpunkt
 # ---------------------------------------------------------------------------
 
-def _starta_http() -> None:
-    """Startar servern i HTTP-läge med valfri Bearer-token-autentisering."""
-    try:
-        from starlette.applications import Starlette
-        from starlette.middleware import Middleware
-        from starlette.middleware.base import BaseHTTPMiddleware
-        from starlette.requests import Request
-        from starlette.responses import Response
-        import uvicorn
-    except ImportError:
-        log.error("HTTP-läge kräver: pip install starlette uvicorn")
-        raise
-
-    class ApiKeyMiddleware(BaseHTTPMiddleware):
-        async def dispatch(self, request: Request, call_next):
-            if MCP_API_KEY:
-                auth = request.headers.get("Authorization", "")
-                if not auth.startswith("Bearer ") or auth[7:] != MCP_API_KEY:
-                    return Response("Obehörig åtkomst", status_code=401)
-            return await call_next(request)
-
-    starlette_app = Starlette(middleware=[Middleware(ApiKeyMiddleware)])
-    # Montera MCP Streamable HTTP-applikationen på Starlette
-    starlette_app.mount("/", mcp.streamable_http_app())
-
-    log.info("Startar HTTP-server på %s:%s", MCP_HOST, MCP_PORT)
-    uvicorn.run(starlette_app, host=MCP_HOST, port=MCP_PORT)
-
-
 if __name__ == "__main__":
-    from db import initiera_schema
-    initiera_schema()
-
-    if MCP_TRANSPORT == "http":
-        _starta_http()
-    else:
-        log.info("Startar stdio-server")
-        mcp.run()
+    starta(mcp, standardport=8000, initiera=initiera_schema)
