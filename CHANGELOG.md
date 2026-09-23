@@ -6,6 +6,42 @@ Versionshanteringen följer [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Ändrat
+
+- **Migrerad till mcp 2.x.** Servern byggs nu med `MCPServer` i stället för
+  `FastMCP`. Egna kopior av `mcp_transport.py` (transportval, `starta(...)`)
+  och `mcp_annotationer.py` (verktygsannotationer, cachningshintar) i
+  repots rot. SSE och andra döda transportvägar är borttagna.
+- **Verktygens returvärden är typade** (`TypedDict`) i stället för
+  JSON-strängar (`-> str` + `json.dumps`). Klienter som läser
+  `structuredContent` får nu ett fullständigt utdataschema per verktyg;
+  klienter som bara läser textinnehållet ser samma JSON som förut.
+  Fält som kan saknas i källdata är typade som `X | None`, inte
+  obligatoriska — historisk SFSR-data har gott om null-fält.
+- **Förväntade fel kastas nu som `ToolError`** i stället för att paketeras
+  som `{"fel": "..."}` i ett annars lyckat textsvar — t.ex. när ett
+  SFS-nummer inte finns i API:et. Svaret får `isError: true` med ett
+  begripligt meddelande. Oväntade fel (t.ex. ett trasigt källsvar) ger
+  fortsatt ett generiskt felmeddelande utan detaljer i protokollet; spåret
+  loggas som förut.
+- Alla fyra verktyg har fått `title` och `annotations`
+  (`readOnlyHint`/`destructiveHint`/`idempotentHint`/`openWorldHint`) —
+  samtliga är läsningar mot en extern källa (`LASNING_EXTERN`), inklusive
+  när svaret kommer ur den lokala cachen.
+- `requirements.txt`: `mcp>=1.0` → `mcp>=2.0,<3`.
+
+### Brytande ändringar
+
+- **http-läget kräver nu `MCP_API_KEY`.** Utan nyckeln avbryts uppstarten
+  (exitkod 2) i stället för att starta ett API utan autentisering. Berör
+  bara den som kör servern med `MCP_TRANSPORT=http` — stdio-läget är
+  opåverkat.
+- **Felformen för kända fel ändras** (se ovan): tidigare gav ett okänt
+  SFS-nummer ett lyckat anrop med `{"fel": "..."}` i texten; nu ett
+  MCP-fel (`isError: true`). En klient som letade efter nyckeln `"fel"` i
+  ett lyckat svar måste läsa `isError` i stället.
+- Verktygsnamn och parametrar är oförändrade.
+
 ### Tillagt
 
 - **`db/efterfyll_utfardad_grundforfattning.py`** — idempotent engångsskript

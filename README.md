@@ -28,9 +28,10 @@ Resultaten cachelagras lokalt för snabb återanvändning.
 ## Krav
 
 - Python 3.11 eller senare
-- Beroenden enligt `requirements.txt`
+- `mcp` 2.x (se `requirements.txt`)
 - PostgreSQL eller SQLite (ingen extra installation krävs för SQLite)
-- Ingen API-nyckel krävs — SFSR är öppet tillgängligt
+- Ingen API-nyckel krävs mot SFSR — källan är öppet tillgänglig. `MCP_API_KEY`
+  krävs bara i http-läget (se "Körning" nedan).
 
 ## Installation
 
@@ -88,15 +89,18 @@ python mcp_server.py
 Starta i HTTP-läge (för hostad driftsättning):
 
 ```bash
-MCP_TRANSPORT=http python mcp_server.py
+MCP_TRANSPORT=http MCP_API_KEY=<nyckel> python mcp_server.py
 ```
 
-I HTTP-läget rekommenderas Bearer-token-autentisering via `MCP_API_KEY`. Generera
-en nyckel med:
+**`MCP_API_KEY` krävs i http-läget** — uppstarten avbryts (exitkod 2) om den
+saknas. Ett öppet API mot en databas med cachade författningar ska inte kunna
+uppstå av misstag. Generera en nyckel med:
 
 ```bash
 python -c "import secrets; print(secrets.token_hex(32))"
 ```
+
+Alla anrop i http-läget måste bära `Authorization: Bearer <nyckel>`.
 
 ## Konfiguration av MCP-klient
 
