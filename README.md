@@ -208,6 +208,28 @@ python 01_explore_sfsr.py      # Utforskar HTML-strukturen på rkrattsbaser.gov.
 python 02_explore_sfsr_api.py  # Utforskar och verifierar Elasticsearch-API:et
 ```
 
+## Efterfyllning av `utfardad_grundforfattning`
+
+Rader som cachades innan rättelsen av fältläsningen (se CHANGELOG) har
+`utfardad_grundforfattning = null` även för författningar där källan
+faktiskt anger utfärdandedatum. `db/efterfyll_utfardad_grundforfattning.py`
+hämtar om varje sådan rad (bara de med `cache_kalla='api'`) och skriver
+tillbaka den fullständiga posten. Skriptet är idempotent — en andra
+körning rör bara rader som fortfarande saknar datumet.
+
+Testa alltid mot en tillfällig databas innan skriptet körs mot drift:
+
+```bash
+DATABASE_URL=sqlite:////tmp/sfsr-test.db python3 db/efterfyll_utfardad_grundforfattning.py
+```
+
+Kör det sedan mot driftdatabasen vid installation, som ett separat,
+avsiktligt steg:
+
+```bash
+python3 db/efterfyll_utfardad_grundforfattning.py
+```
+
 ## Kända begränsningar
 
 - **Förarbeten kan saknas** för vissa ändrings-SFS — API:et returnerar inte alltid

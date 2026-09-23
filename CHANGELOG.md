@@ -6,6 +6,13 @@ Versionshanteringen följer [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Tillagt
+
+- **`db/efterfyll_utfardad_grundforfattning.py`** — idempotent engångsskript
+  som hämtar om API-cachade rader där `utfardad_grundforfattning` är null
+  och fyller i värdet. Se README, avsnittet "Efterfyllning av
+  `utfardad_grundforfattning`", för hur det körs.
+
 ### Rättat
 
 - **`utfardad_grundforfattning` alltid null (API-backend).** `_till_datamodell_api`
