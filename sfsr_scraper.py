@@ -410,7 +410,7 @@ def _till_datamodell_api(kalla: dict, sfs_nr: str) -> dict:
         "sfs_nr":                    sfs_nr,
         "rubrik":                    kalla.get("rubrik"),
         "ikraft_grundforfattning":   _datum_api(kalla.get("ikraftDateTime")),
-        "utfardad_grundforfattning": _datum_api(kalla.get("utfardadDateTime")),
+        "utfardad_grundforfattning": _datum_api(fulltext.get("utfardadDateTime")),
         "upphavd_datum":             _datum_api(kalla.get("upphavdDateTime")),
         "upphavd_genom":             fulltext.get("upphavdGenom"),
         "departement":               (kalla.get("organisation") or {}).get("namnOchEnhet"),

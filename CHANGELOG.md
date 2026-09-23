@@ -4,6 +4,30 @@ Alla meningsfulla ändringar dokumenteras här.
 Formatet följer [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versionshanteringen följer [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Rättat
+
+- **`utfardad_grundforfattning` alltid null (API-backend).** `_till_datamodell_api`
+  läste `utfardadDateTime` på toppnivån i Elasticsearch-svaret, men API:et
+  placerar fältet under `fulltext.utfardadDateTime`. Kolumnen blev därför
+  alltid null för författningar hämtade via API-backenden, oavsett om
+  källan faktiskt hade datumet. Verifierat mot brottsbalken (1962:700 —
+  utfärdad 1962-12-21) och SFS 1980:11 (utfärdad 1980-01-10): båda saknades
+  helt trots att API-svaret innehåller värdet.
+
+  Audit 2026-05-22 (Bg6, rad 285) beskrev null för 1980:11 som ett
+  innehållsgap hos källan. Det var fel — orsaken var fältläsning på fel
+  nivå i klientkoden, inte en lucka i SFSR:s data.
+
+  Övriga toppnivåfält (`ikraftDateTime`, `upphavdDateTime`) ligger korrekt
+  på toppnivån i svaret och är opåverkade. Genomgången av samtliga använda
+  fält hittade inga fler fält med samma fel.
+
+  Befintliga cachade rader fylls inte i automatiskt av denna rättelse —
+  se avsnittet "Efterfyllning av `utfardad_grundforfattning`" i README för
+  hur `db/efterfyll_utfardad_grundforfattning.py` körs vid installation.
+
 ## [4.1.0] — 2026-08-10
 
 ### Tillagt
