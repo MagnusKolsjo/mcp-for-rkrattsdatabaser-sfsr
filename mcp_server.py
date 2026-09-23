@@ -23,9 +23,11 @@ from __future__ import annotations
 
 import logging
 import os
+import sqlite3
 from pathlib import Path
-from typing import Annotated, Literal, NotRequired, Optional, TypedDict
+from typing import Annotated, Callable, NotRequired, Optional, TypedDict, TypeVar
 
+import httpx
 from dotenv import load_dotenv
 
 _SCRIPT_DIR = Path(__file__).parent.resolve()
@@ -34,6 +36,17 @@ load_dotenv(_SCRIPT_DIR / ".env")
 from mcp.server.mcpserver import MCPServer  # noqa: E402
 from mcp.server.mcpserver.exceptions import ToolError  # noqa: E402
 from pydantic import Field  # noqa: E402
+
+try:
+    import psycopg2
+    _DB_FEL: tuple[type[Exception], ...] = (sqlite3.Error, psycopg2.Error)
+except ImportError:
+    _DB_FEL = (sqlite3.Error,)
+
+# Käll- och databasfel som är förväntade driftlägen (nätet är nere,
+# databasen är otillgänglig) — inte kodfel — och därför ska ge ett
+# begripligt ToolError i stället för att krascha anropet utan förklaring.
+_KALLFEL: tuple[type[Exception], ...] = (httpx.HTTPError, OSError, *_DB_FEL)
 
 from db import initiera_schema  # noqa: E402
 from mcp_annotationer import CACHE_HINTAR, LASNING_EXTERN  # noqa: E402
@@ -189,6 +202,34 @@ def _andring(a: dict) -> Andring:
     }
 
 
+_T = TypeVar("_T")
+
+
+def _sakert_anrop(beskrivning: str, fn: Callable[[], _T]) -> _T:
+    """Kör fn() och omvandlar kända käll- och databasfel till ToolError.
+
+    ValueError signalerar att SFS-numret inte hittades i källan — meddelandet
+    är redan begripligt och skickas vidare oförändrat. Nätverks- och
+    databasfel (_KALLFEL: httpx, sqlite3, ev. psycopg2, OSError) signalerar
+    att källan eller cachen är otillgänglig just nu — ett förväntat driftläge,
+    inte ett kodfel. Den tekniska detaljen loggas; klienten får ett svenskt
+    meddelande som säger vad som hände utan att läcka stacktrace-detaljer.
+
+    Oväntade undantag (programmeringsfel) fångas inte här och ger MCP:s
+    generiska felsvar, med spåret på stderr, som avsett.
+    """
+    try:
+        return fn()
+    except ValueError as e:
+        raise ToolError(str(e)) from e
+    except _KALLFEL as e:
+        log.exception("%s: käll- eller databasfel", beskrivning)
+        raise ToolError(
+            f"{beskrivning} misslyckades på grund av ett käll- eller databasfel "
+            f"({type(e).__name__}: {e}). Försök igen senare."
+        ) from e
+
+
 # ---------------------------------------------------------------------------
 # MCP-server
 # ---------------------------------------------------------------------------
@@ -229,10 +270,10 @@ def sfsr_hamta_andringshistorik(
     Fältet historisk=true markerar poster som är inaktuella enligt källan
     (t.ex. ersatta av en ny version av samma ändring).
     """
-    try:
-        resultat = _hamta_andringshistorik(sfs_nr)
-    except ValueError as e:
-        raise ToolError(str(e)) from e
+    resultat = _sakert_anrop(
+        f"Hämta ändringshistorik för {sfs_nr}",
+        lambda: _hamta_andringshistorik(sfs_nr),
+    )
 
     return {
         "sfs_nr":                    resultat["sfs_nr"],
@@ -271,10 +312,10 @@ def sfsr_hamta_paragrafhistorik(
     Tips: hämta först hela historiken med sfsr_hamta_andringshistorik för att
     se vilka paragrafer som ändrats och hur de är betecknade i SFSR.
     """
-    try:
-        resultat = _hamta_paragrafhistorik(sfs_nr, paragraf)
-    except ValueError as e:
-        raise ToolError(str(e)) from e
+    resultat = _sakert_anrop(
+        f"Hämta paragrafhistorik för {sfs_nr} §{paragraf}",
+        lambda: _hamta_paragrafhistorik(sfs_nr, paragraf),
+    )
 
     return [_andring(a) for a in resultat]
 
@@ -297,14 +338,13 @@ def sfsr_folj_andringskedja(
     få fullständig spårbarhet från gällande rätt tillbaka till ursprungsproposition.
     """
     djup = min(max(1, djup), 20)
-    try:
+
+    def _hamta() -> list[dict]:
         if paragraf:
-            andringar = _hamta_paragrafhistorik(sfs_nr, paragraf)
-        else:
-            lag = _hamta_andringshistorik(sfs_nr)
-            andringar = lag["andringar"]
-    except ValueError as e:
-        raise ToolError(str(e)) from e
+            return _hamta_paragrafhistorik(sfs_nr, paragraf)
+        return _hamta_andringshistorik(sfs_nr)["andringar"]
+
+    andringar = _sakert_anrop(f"Följ ändringskedja för {sfs_nr}", _hamta)
 
     # Returnera de senaste `djup` ändringarna i omvänd ordning (nyast först)
     kedjeled = list(reversed(andringar[-djup:]))
@@ -345,10 +385,10 @@ def sfsr_hamta_lagtext(
 
     Citera aldrig ur ett svar där trunkerad är true — läs vidare först.
     """
-    try:
-        resultat = _hamta_lagtext(sfs_nr)
-    except ValueError as e:
-        raise ToolError(str(e)) from e
+    resultat = _sakert_anrop(
+        f"Hämta lagtext för {sfs_nr}",
+        lambda: _hamta_lagtext(sfs_nr),
+    )
 
     svar: Lagtext = {
         "sfs_nr":    resultat["sfs_nr"],
