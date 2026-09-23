@@ -69,8 +69,20 @@ def initiera_sqlite(url: str) -> None:
 
 
 def _maskera_url(url: str) -> str:
-    """Maskerar lösenordsdelen i en databas-URL för säker loggning/utskrift."""
-    return re.sub(r"://([^:]+):([^@]+)@", r"://\1:***@", url)
+    """Maskerar lösenord i en databas-URL för säker loggning/utskrift.
+
+    Täcker två platser ett lösenord kan stå i en anslutnings-URL:
+
+    - `scheme://user:lösenord@host` — lösenordsdelen fångas girigt (`.+`)
+      så att den matchar fram till det SISTA `@`-tecknet i strängen. Ett
+      lösenord som själv innehåller `@` (giltigt i en URL) skulle annars
+      bara maskeras fram till sitt första `@`, vilket läcker resten.
+    - Frågeparametrar som `?password=...` eller `&pwd=...` — vissa
+      drivrutiner accepterar lösenordet så i stället för i userinfo-delen.
+    """
+    url = re.sub(r"://([^:@/]+):(.+)@", r"://\1:***@", url)
+    url = re.sub(r"(?i)([?&](?:password|passwd|pwd)=)[^&]*", r"\1***", url)
+    return url
 
 
 def main() -> None:
