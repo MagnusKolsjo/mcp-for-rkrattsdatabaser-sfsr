@@ -66,7 +66,7 @@ from sfsr_tools import sfsr_hamta_paragrafhistorik as _hamta_paragrafhistorik  #
 SFSR_MAX_TECKEN = int(os.getenv("SFSR_MAX_TECKEN", "60000"))
 
 # Versionen följer senaste släppta version i CHANGELOG.md.
-SERVERVERSION = "4.1.0"
+SERVERVERSION = "5.0.0"
 
 logging.basicConfig(
     level=logging.INFO,

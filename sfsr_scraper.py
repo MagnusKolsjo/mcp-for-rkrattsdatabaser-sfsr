@@ -48,7 +48,7 @@ SFSR_API_URL         = os.getenv(
 SFSR_CACHE_TTL_HOURS = int(os.getenv("SFSR_CACHE_TTL_HOURS", "24"))
 USER_AGENT           = os.getenv(
     "USER_AGENT",
-    "mcp-for-rkrattsdatabaser-sfsr/1.0 (+https://github.com/MagnusKolsjo/mcp-for-rkrattsdatabaser-sfsr)",
+    "mcp-for-rkrattsdatabaser-sfsr/5.0 (+https://github.com/MagnusKolsjo/mcp-for-rkrattsdatabaser-sfsr)",
 )
 
 # ---------------------------------------------------------------------------

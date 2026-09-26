@@ -37,7 +37,7 @@ import requests
 
 SFSR_API_BASE_URL = "https://beta.rkrattsbaser.gov.se"
 SFSR_API_ENDPOINT = f"{SFSR_API_BASE_URL}/elasticsearch/SearchEsByRawJson"
-USER_AGENT = "mcp-for-rkrattsdatabaser-sfsr/1.0 (+https://github.com/MagnusKolsjo/mcp-for-rkrattsdatabaser-sfsr)"
+USER_AGENT = "mcp-for-rkrattsdatabaser-sfsr/5.0 (+https://github.com/MagnusKolsjo/mcp-for-rkrattsdatabaser-sfsr)"
 
 TESTLAGAR = [
     ("1993:1617", "Ordningslag — liten lag, ett CELEX-nr"),

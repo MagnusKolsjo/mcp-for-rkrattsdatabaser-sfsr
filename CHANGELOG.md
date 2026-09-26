@@ -6,8 +6,11 @@ Versionshanteringen följer [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [5.0.0] — 2026-09-26
+
 ### Ändrat
 
+- User-Agent-strängen följer huvudversionen: `mcp-for-rkrattsdatabaser-sfsr/5.0`.
 - **Migrerad till mcp 2.x.** Servern byggs nu med `MCPServer` i stället för
   `FastMCP`. Egna kopior av `mcp_transport.py` (transportval, `starta(...)`)
   och `mcp_annotationer.py` (verktygsannotationer, cachningshintar) i

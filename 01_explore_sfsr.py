@@ -23,7 +23,7 @@ import requests
 from bs4 import BeautifulSoup
 
 SFSR_BASE_URL = "https://rkrattsbaser.gov.se/sfsr"
-USER_AGENT = "mcp-for-rkrattsdatabaser-sfsr/1.0 (+https://github.com/MagnusKolsjo/mcp-for-rkrattsdatabaser-sfsr)"
+USER_AGENT = "mcp-for-rkrattsdatabaser-sfsr/5.0 (+https://github.com/MagnusKolsjo/mcp-for-rkrattsdatabaser-sfsr)"
 
 TESTLAGAR = [
     ("1993:1617", "Ordningslag — liten lag, ett CELEX-nr"),
