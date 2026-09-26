@@ -10,6 +10,7 @@ Versionshanteringen följer [Semantic Versioning](https://semver.org/).
 
 ### Ändrat
 
+- Texterna är produktneutrala: README, konfigurationsexempel, kommentarer och äldre CHANGELOG-poster nämner MCP-klienten i stället för en viss klient.
 - User-Agent-strängen följer huvudversionen: `mcp-for-rkrattsdatabaser-sfsr/5.0`.
 - **Migrerad till mcp 2.x.** Servern byggs nu med `MCPServer` i stället för
   `FastMCP`. Egna kopior av `mcp_transport.py` (transportval, `starta(...)`)
@@ -108,7 +109,7 @@ trunkering, adressering och sökning"). Additiva parametrar och fält — inga b
 - `sfsr_get_paragraph_history` → `sfsr_hamta_paragrafhistorik`
 - `sfsr_trace_chain` → `sfsr_folj_andringskedja`
 
-**Server-ID ändrat:** `sfsr` → `sfsr-v2` (för att tvinga cache-bustning i Claude Desktop
+**Server-ID ändrat:** `sfsr` → `sfsr-v2` (för att tvinga cache-bustning i MCP-klienten
 vid namnbytet ovan).
 
 **CELEX-fält returneras nu som lista** (`list[str]`) i stället för kommaseparerad sträng.

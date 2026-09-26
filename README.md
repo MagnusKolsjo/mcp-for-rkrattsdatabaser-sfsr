@@ -105,7 +105,7 @@ Alla anrop i http-läget måste bära `Authorization: Bearer <nyckel>`.
 ## Konfiguration av MCP-klient
 
 Servern fungerar med alla AI-verktyg som stöder MCP-protokollet.
-Nedan visas ett konfigurationsexempel för Claude Desktop (`claude_desktop_config.json`):
+Nedan visas ett konfigurationsexempel i formatet `mcpServers`, som flera MCP-klienter använder:
 
 ```json
 {
